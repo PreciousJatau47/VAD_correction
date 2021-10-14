@@ -1,6 +1,14 @@
 import sys
+import os
 import numpy as np
 import pandas as pd
+import pyart
+import matplotlib.pyplot as plt
+
+font = {'family': 'DejaVu Sans',
+        'weight': 'bold',
+        'size': 10}
+plt.rc('font', **font)
 
 
 def read_info_from_radar_name(radar_file):
@@ -18,49 +26,56 @@ def read_info_from_radar_name(radar_file):
     ss = radar_file[17:19]
     return radar_name, year, month, day, hh, mm, ss
 
-def find_hca_file_name_from_radar(radar_file):
-    """
-    Finds the corresponding hca PPI name given a radar PPI name.
-    :param radar_file:
-    :return:
-    """
+def GetHcaPath(hca_day_folder, radar_file, hca_el, el_desc_hca):
+    suffix = "".join(["SDUS84_", el_desc_hca[hca_el], "{}_{}{}{}{}"])
+    hca_subfolder = el_desc_hca[hca_el]
+
     radar_name = radar_file[:4]
     year = radar_file[4:8]
     month = radar_file[8:10]
     day = radar_file[10:12]
     hhmm = radar_file[13:17]
-    # KOUN_...
-    # KHUN ...
-    # KOHX
-    return "KOUN_SDUS84_N0H{}_{}{}{}{}".format(radar_name[1:], year, month, day, hhmm)
+    suffix = suffix.format(radar_name[1:], year, month, day, hhmm)
 
-def ReadRadarSlice(radar, radar_products_slice, slice_idx):
-    """
-    :param radar:
-    :param radar_products_slice:
-    :param slice_idx:
-    :return:
-    """
-    if slice_idx > 1 or slice_idx < 0:
-        sys.exit("ReadRadarCutAsTable can only process slice 0 and slice 1.")
+    target_folder = os.path.join(hca_day_folder, hca_subfolder)
+    for hca_file in os.listdir(target_folder):
+        if hca_file.endswith(suffix):
+            return os.path.join(target_folder, hca_file)
+    return None  # file not found.
 
+def GetHcaVol(hca_day_folder, radar_file):
+    el_desc_hca = {0.5: "N0H", 1.5: "N1H", 2.5: "N2H", 3.5: "N3H"}
+    volume_hca = {}
+    for el_hca in el_desc_hca.keys():
+        volume_hca[el_hca] = pyart.io.read_nexrad_level3(GetHcaPath(hca_day_folder, radar_file, el_hca, el_desc_hca))
+    print(volume_hca[el_hca].fields['radar_echo_classification']['options'])
+    return volume_hca
+
+def ReadRadarSliceUpdate(radar, slice_idx):
     radar_range = radar.range['data'] / 1000  # in km
     sweep_ind = radar.get_slice(slice_idx)
     radar_az_deg = radar.azimuth['data'][sweep_ind]  # in degrees
+    radar_el = radar.elevation['data'][sweep_ind]
 
-    if slice_idx == 0:
-        radar_mask = radar.fields["differential_reflectivity"]['data'][sweep_ind].mask
-    elif slice_idx == 1:
-        radar_mask = radar.fields["velocity"]['data'][sweep_ind].mask
+    placeholder_matrix = np.empty(radar.fields["reflectivity"]['data'][sweep_ind].shape)
+    placeholder_matrix[:] = np.nan
+    radar_mask = placeholder_matrix
 
     data_slice = []
-    for radar_variable in radar_products_slice[slice_idx]:
-        print(radar_variable)
-        curr_data = radar.fields[radar_variable]['data'][sweep_ind].data  # .reshape(-1, 1)
-        data_slice.append(curr_data)
-    print("ReadRadarSlice ", data_slice[0].shape)
+    labels_slice = list(radar.fields.keys())
+    labels_slice.sort()
+    mask_slice = []
+    for radar_product in labels_slice:
+        if np.sum(radar.fields[radar_product]['data'][sweep_ind].mask == False) > 0:
+            data_slice.append(radar.fields[radar_product]['data'][sweep_ind].data)
+            mask_slice.append(True)
+            if radar_product == 'velocity':
+                radar_mask = radar.fields[radar_product]['data'][sweep_ind].mask
+        else:
+            data_slice.append(placeholder_matrix)
+            mask_slice.append(False)
 
-    return radar_range, radar_az_deg, data_slice.copy(), radar_mask
+    return radar_range, radar_az_deg, radar_el, data_slice.copy(), mask_slice.copy(), labels_slice, radar_mask
 
 def MatchGates(arr, key_arr):
     """
@@ -77,82 +92,169 @@ def MatchGates(arr, key_arr):
         # print(arr[match_idxs[i]], "-", key_arr[i])
     return match_idxs
 
-def MergeRadarAndHCA(radar, radar_products_slice, hca, maxRange):
-    """
-    :param radar:
-    :param radar_products_slice:
-    :param hca:
-    :param maxRange:
-    :return:
-    """
-    range_dp, az_dp, data_slice_dp, radar_mask_dp = ReadRadarSlice(radar, radar_products_slice, 0)  # dp
-    range_sp, az_sp, data_slice_sp, radar_mask_sp = ReadRadarSlice(radar, radar_products_slice, 1)  # sp
 
-    print(hca.fields['radar_echo_classification']['options'])
-    hca_az_deg = hca.azimuth['data']  # in degrees
-    hca_range = hca.range['data'] / 1000  # in km
-    hca_mask = hca.fields['radar_echo_classification']['data'].mask
-    hca_data = hca.fields['radar_echo_classification']['data'].data
-    print(hca_data.shape)
+def VisualizeDataTable(data_table, color_map, output_folder):
+    if not os.path.isdir(output_folder):
+        os.makedirs(output_folder)
 
+    az_bins = np.unique(data_table["azimuth"])
+    range_bins = np.unique(data_table["range"])
+    elevation_slices = np.unique(data_table["elevation"])
+
+    num_az = len(az_bins)
+    num_range = len(range_bins)
+
+    az_grid = np.array(data_table["azimuth"][data_table["elevation"] == 0.5])
+    az_grid = az_grid.reshape(num_az, num_range)
+    range_grid = np.array(data_table["range"][data_table["elevation"] == 0.5])
+    range_grid = range_grid.reshape(num_az, num_range)
+
+    products = list(color_map.keys())
+    for product in products:
+        output_path = output_folder + "\\" + product + ".png"
+
+        # Select color map.
+        if product == "hca" or product == "hca_bio" or product == "hca_weather" or product == "BIClass":
+            cmap = plt.cm.get_cmap(color_map[product][0], color_map[product][2])
+        else:
+            cmap = pyart.graph.cm._generate_cmap(color_map[product][0], color_map[product][2])
+
+        fig, ax = plt.subplots(2, 2, sharex=True, sharey=True)
+        count_subplot = 0
+        for curr_el in elevation_slices:
+            x = np.multiply(range_grid * np.cos(curr_el * np.pi / 180), np.sin(az_grid * np.pi / 180))
+            y = np.multiply(range_grid * np.cos(curr_el * np.pi / 180), np.cos(az_grid * np.pi / 180))
+            data_grid = np.array(data_table[product][data_table["elevation"] == curr_el])
+            data_grid = data_grid.reshape(num_az, num_range)
+
+            im = ax[count_subplot // 2, count_subplot % 2].pcolor(x, y, data_grid, cmap=cmap,
+                                                                  vmin=color_map[product][1][0],
+                                                                  vmax=color_map[product][1][1])
+            # ax[count_subplot // 2, count_subplot % 2].set_xlabel('X [km]')
+            # ax[count_subplot // 2, count_subplot % 2].set_ylabel('Y [km]')
+            ax[count_subplot // 2, count_subplot % 2].set_title(str(curr_el) + "$^{\circ}$.")
+            count_subplot += 1
+        fig.add_subplot(111, frameon=False)
+        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+        plt.xlabel('X [km]')
+        plt.ylabel('Y [km]')
+        fig.suptitle(product)
+        plt.tight_layout()
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+        fig.colorbar(im, cax=cbar_ax)
+        # plt.show()
+        plt.savefig(output_path, dpi=200)
+        plt.close(fig)
+    return
+
+# TODO mask_dp
+def MergeRadarAndHCAUpdate(radar, hca_volume, maxRange):
+    # Define common grid
     range_common = np.arange(10, maxRange, 0.25)
     az_common = np.arange(0, 360, 0.5)
 
-    # Match dual pol variables to common grid.
-    range_idxs_dp = MatchGates(range_dp, range_common)
-    az_idxs_dp = MatchGates(az_dp, az_common)
-    print(data_slice_dp[0].shape)
-    for i in range(len(data_slice_dp)):
-        data_slice_dp[i] = data_slice_dp[i][np.ix_(az_idxs_dp, range_idxs_dp)]
-        data_slice_dp[i] = data_slice_dp[i].reshape(-1,1)
-    print(data_slice_dp[0].shape)
-    radar_mask_dp = radar_mask_dp[np.ix_(az_idxs_dp, range_idxs_dp)]
-    radar_mask_dp = np.logical_not(radar_mask_dp.reshape(-1,1))
+    # Number of radar sweeps.
+    n_sweeps = radar.nsweeps
+    slice_store = dict(zip(hca_volume.keys(), [None for i in range(len(hca_volume))]))
 
-    # Match single pol variables to common grid.
-    range_idxs_sp = MatchGates(range_sp, range_common)
-    az_idxs_sp = MatchGates(az_sp, az_common)
-    print(data_slice_sp[0].shape)
-    for i in range(len(data_slice_sp)):
-        data_slice_sp[i] =  data_slice_sp[i][np.ix_(az_idxs_sp, range_idxs_sp)]
-        data_slice_sp[i] = data_slice_sp[i].reshape(-1,1)
-    print(data_slice_sp[0].shape)
-    radar_mask_sp = radar_mask_sp[np.ix_(az_idxs_sp, range_idxs_sp)]
-    radar_mask_sp = np.logical_not(radar_mask_sp.reshape(-1,1))
+    for radar_sweep_idx in range(n_sweeps):
+        radar_el = np.mean(radar.elevation['data'][radar.get_slice(radar_sweep_idx)])
+        radar_el = round(radar_el / 0.5) * 0.5
+        # print(radar_el)
 
-    range_idxs_hca = MatchGates(hca_range, range_common)
-    az_idxs_hca = MatchGates(hca_az_deg, az_common)
-    hca_data =  hca_data[np.ix_(az_idxs_hca, range_idxs_hca)]
-    hca_data = hca_data.reshape(-1,1)
-    hca_mask = hca_mask[np.ix_(az_idxs_hca, range_idxs_hca)]
-    hca_mask = np.logical_not(hca_mask.reshape(-1,1))
+        # build radar + hca table if radar elevation matches hca elevation
+        if radar_el in hca_volume.keys():
+            radar_range, radar_az_deg, _, data_slice, mask_slice, labels_slice, radar_mask = ReadRadarSliceUpdate(radar,
+                                                                                                                  radar_sweep_idx)
+            # interpolate to common grid
+            range_idxs = MatchGates(radar_range, range_common)
+            az_idxs = MatchGates(radar_az_deg, az_common)
 
-    # combine variables
-    data_slice = data_slice_dp
-    data_slice.extend(data_slice_sp)
-    columns = radar_products_slice[0].copy()
-    columns.extend(radar_products_slice[1].copy())
+            for i in range(len(data_slice)):
+                data_slice[i] = data_slice[i][np.ix_(az_idxs, range_idxs)]
+                data_slice[i] = data_slice[i].reshape(-1, 1)
+            radar_mask = radar_mask[np.ix_(az_idxs, range_idxs)]
+            radar_mask = np.logical_not(radar_mask.reshape(-1, 1))
 
-    data_slice.append(hca_data)
-    data_slice.append(hca_mask)
-    columns.extend(["hca","hca_mask"])
+            # store slice.
+            if slice_store[radar_el] == None:
+                slice_store[radar_el] = [data_slice, mask_slice, radar_mask]
+            else:  # update existing data slice
+                print("slice already exists")
+                for product_idx in range(len(labels_slice)):
+                    if not slice_store[radar_el][1][product_idx]:
+                        slice_store[radar_el][0][product_idx] = data_slice[product_idx]
+                        slice_store[radar_el][1][product_idx] = mask_slice[product_idx]
+                        if labels_slice[product_idx] == 'velocity':
+                            slice_store[radar_el][2] = radar_mask
 
-    data_slice.append(radar_mask_dp)
-    data_slice.append(radar_mask_sp)
-    columns.extend(["mask_dp", "mask_sp"])
+        else:  # invalid elevation for radar-hca fusion.
+            print("invalid elevation. {} degrees".format(radar_el))
 
-    range_common, az_common = np.meshgrid(range_common, az_common)
-    az_common = az_common.reshape(-1, 1)
-    range_common = range_common.reshape(-1, 1)
-    data_slice.append(az_common)
-    data_slice.append(range_common)
-    columns.extend(["azimuth", "range"])
+    # Merge tables from different elevations.
+    data_tables = []
+    for hca_el in hca_volume.keys():
 
-    data_table = np.concatenate(data_slice, axis=1)
-    data_table = pd.DataFrame(data_table, columns=columns)
+        if slice_store[hca_el] == None:
+            continue
+
+        # Define common grid
+        range_common = np.arange(10, maxRange, 0.25)
+        az_common = np.arange(0, 360, 0.5)
+
+        # Get radar scan.
+        data_table = slice_store[hca_el][0]
+        columns = labels_slice.copy()
+
+        data_table.append(slice_store[hca_el][2])
+        columns.append("mask_velocity")
+
+        # Read HCA.
+        print("Reading HCA. el = {} degrees.".format(hca_el))
+        hca = hca_volume[hca_el]
+        hca_az_deg = hca.azimuth['data']  # in degrees
+        hca_range = hca.range['data'] / 1000  # in km
+        hca_mask = hca.fields['radar_echo_classification']['data'].mask
+        hca_data = hca.fields['radar_echo_classification']['data'].data
+
+        # Interpolate.
+        range_idxs_hca = MatchGates(hca_range, range_common)
+        az_idxs_hca = MatchGates(hca_az_deg, az_common)
+        hca_data = hca_data[np.ix_(az_idxs_hca, range_idxs_hca)]
+        hca_data = hca_data.reshape(-1, 1)
+        hca_mask = hca_mask[np.ix_(az_idxs_hca, range_idxs_hca)]
+        hca_mask = np.logical_not(hca_mask.reshape(-1, 1))
+
+        # Add HCA to data table.
+        data_table.append(hca_data)
+        columns.append("hca")
+        data_table.append(hca_mask)
+        columns.append("hca_mask")
+
+        # Azimuth, range and elevation.
+        range_common, az_common = np.meshgrid(range_common, az_common)
+
+        az_common = az_common.reshape(-1, 1)
+        data_table.append(az_common)
+        columns.append("azimuth")
+
+        range_common = range_common.reshape(-1, 1)
+        data_table.append(range_common)
+        columns.append("range")
+
+        data_table = np.concatenate(data_table, axis=1)
+        data_table = pd.DataFrame(data_table, columns=columns)
+        data_table["elevation"] = hca_el
+        # print(data_table.shape)
+        data_tables.append(data_table)
+
+    # Merge tables
+    data_table = pd.concat(data_tables, axis=0)
+    # print(data_table.shape)
     return data_table
 
-def ReadRadarCutAsTable(radar, radar_products_slice, slice_idx):
+def ReadRadarCutAsTableUpdate(radar, slice_idx):
     """
     Assumes elevation is 0.5 degrees.
     :param radar:
@@ -160,20 +262,31 @@ def ReadRadarCutAsTable(radar, radar_products_slice, slice_idx):
     :param slice_idx:
     :return:
     """
-    radar_range, radar_az_deg, data_slice, radar_mask = ReadRadarSlice(radar, radar_products_slice, slice_idx)
+    radar_range, radar_az_deg, radar_el, data_slice, labels_slice, radar_mask = ReadRadarSliceUpdate(radar, slice_idx)
 
     for i in range(len(data_slice)):
         data_slice[i] = data_slice[i].reshape(-1, 1)
-    print("ReadRadarCutAsTable ", data_slice[0].shape)
+    print("ReadRadarCutAsTableUpdate ", data_slice[0].shape)
 
-    columns = radar_products_slice[slice_idx].copy()
-    columns.extend(["mask", "range", "azimuth"])
+    columns = labels_slice
+    columns.extend(["mask", "range", "azimuth", "elevation"])
     data_slice.append(radar_mask.reshape(-1, 1))
+    print(radar_mask.shape)
+    print(radar_mask[3])
+
+    # Range.
     range_grid, az_grid = np.meshgrid(radar_range, radar_az_deg)
     range_grid = range_grid.reshape(-1, 1)
     data_slice.append(range_grid)
+
+    # Azimuth.
     az_grid = az_grid.reshape(-1, 1)
     data_slice.append(az_grid)
+
+    # Elevation.
+    _, el_grid = np.meshgrid(radar_range, radar_el)
+    el_grid = el_grid.reshape(-1, 1)
+    data_slice.append(el_grid)
 
     radar_data_table = np.concatenate(data_slice, axis=1)
     radar_data_table = pd.DataFrame(radar_data_table, columns=columns)
