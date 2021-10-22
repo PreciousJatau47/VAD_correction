@@ -1,4 +1,6 @@
 import pandas as pd
+import os
+import pickle
 from bs4 import BeautifulSoup
 import urllib.request
 import numpy as np
@@ -7,6 +9,7 @@ import matplotlib.pyplot as plt
 from HaverSineDistance import GetHaverSineDistance
 
 KNOT_T_MPS = 0.514444
+
 
 def GetSoundingDateTimeFromRadarFile(radar_file):
     year = radar_file[4:8]
@@ -30,10 +33,12 @@ def GetSoundingDateTimeFromRadarFile(radar_file):
 
     return year, month, sounding_ddhh
 
+
 def GetSoundingUrlFromRadarFile(sounding_url_base, radar_file, station_id):
     year, month, sounding_ddhh = GetSoundingDateTimeFromRadarFile(radar_file)
     sounding_url = sounding_url_base.format(year, month, sounding_ddhh, sounding_ddhh, station_id)
-    return sounding_url
+    return sounding_url, ''.join([year, month, sounding_ddhh])
+
 
 def GetSoundingData(url):
     # Import table from url.
@@ -72,7 +77,8 @@ def GetSoundingData(url):
     return sounding_data_df, header_units, meta_data_dic
 
 
-def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_id, showDebugPlot):
+def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_id, sounding_log_dir, showDebugPlot, log_sounding_data,
+                    force_website_download):
     """
     :param sounding_url_base:
     :param radar_data_file:
@@ -81,10 +87,19 @@ def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_
     :param showDebugPlot:
     :return: data frame containing height, temperature, wind speed, wind direction, U and V components.
     """
-
     # Read sounding data.
-    sounding_url = GetSoundingUrlFromRadarFile(sounding_url_base, radar_data_file, station_id)
+    sounding_url, timestamp = GetSoundingUrlFromRadarFile(sounding_url_base, radar_data_file, station_id)
     print(sounding_url)
+
+    # Load sounding data if local copy exists.
+    sounding_log_path = os.path.join(sounding_log_dir, timestamp + ".pkl")
+    if not force_website_download and os.path.exists(sounding_log_path):
+        print("Loading local copy of sounding data.... ")
+        pin = open(sounding_log_path, 'rb')
+        sounding_data_logged = pickle.load(pin)
+        pin.close()
+        return sounding_data_logged
+
     sounding_data_df, header_units, meta_data = GetSoundingData(sounding_url)
 
     # Location of sounding station in degrees and meters.
@@ -113,6 +128,14 @@ def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_
     sounding_data_df['windU'] = sounding_data_df['SMPS'] * np.sin(sounding_data_df['DRCT'] * np.pi / 180)
     sounding_data_df['windV'] = sounding_data_df['SMPS'] * np.cos(sounding_data_df['DRCT'] * np.pi / 180)
     print(sounding_data_df.columns)
+
+    # Save sounding data.
+    if log_sounding_data:
+        out_data = (
+        sounding_data_df[['HGHT', 'TEMP', 'DRCT', 'SMPS', 'windU', 'windV']], location_sounding, sounding_url)
+        with open(sounding_log_path, 'wb') as sd:
+            pickle.dump(out_data, sd)
+        sd.close()
 
     if showDebugPlot:
         plt.figure()

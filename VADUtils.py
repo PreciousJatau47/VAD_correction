@@ -1,10 +1,29 @@
 import numpy as np
 import random
+import math
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import least_squares, minimize
+from VADMaskEnum import VADMask
 
 MIN_FRACTION_SAMPLES_REQUIRED = 1.5
+
+def GetVADMask(data_table, echo_type):
+    if echo_type == VADMask.biological:
+        vad_mask_arr = np.logical_and(data_table["hca_bio"], data_table["mask_velocity"])
+    elif echo_type == VADMask.insects:
+        vad_mask_arr = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
+        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["BIClass"] == 0)
+        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["mask_velocity"])
+    elif echo_type == VADMask.birds:
+        vad_mask_arr = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
+        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["BIClass"] == 1)
+        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["mask_velocity"])
+    elif echo_type == VADMask.weather:
+        vad_mask_arr = np.logical_and(data_table["hca_weather"], data_table["mask_velocity"])
+    else:
+        vad_mask_arr = data_table["mask_velocity"]
+    return vad_mask_arr
 
 
 def fitVAD(pred_var, resp_var, signal_func, showDebugPlot):
@@ -37,21 +56,65 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot):
     # print("estimated wind speed :", wind_speed, "mps.\nDirection: ", wind_dir, " degrees.")
 
     if showDebugPlot:
-        plt.figure()
-        plt.plot(pred_var, resp_var, label="data", color="blue")
-        plt.plot(pred_var, optimized_signal, label="VAD fit", color="red", alpha=1.0)
-        plt.legend()
+        fig, ax = plt.subplots(1,2, figsize = (8.0,6.4))
+        ax[0].plot(pred_var, resp_var, label="data", color="blue")
+        ax[0].plot(pred_var, optimized_signal, label="VAD fit", color="red", alpha=1.0)
+        ax[0].set_title("VAD fit")
+        ax[0].legend()
+
+        ax[1].hist(pred_var, bins = 4)
+        ax[1].set_title("Azimuth distribution.")
+        ax[1].set_xlabel("Azimuth [$^{\circ}$]")
+        ax[1].set_ylabel("Bin count")
+
         plt.show()
     return wind_speed, wind_dir, optimized_signal
 
 
-def VADWindProfile(signal_func, vad_ranges, vad_mask, radar_sp_table, showDebugPlot):
+def IsVADDistributionValid(az_cut, wind_dir, echo_type):
+    if echo_type != VADMask.insects:
+        return True
+
+    az_cut_bins = (az_cut - wind_dir) % 360 // 90
+    az_bins_id = np.unique(az_cut_bins)
+    az_bins_id = az_bins_id.astype('int32')
+
+    az_dist = np.zeros(az_bins_id.shape)
+    for bin_idx in az_bins_id:
+        az_dist[bin_idx] = np.sum(az_cut_bins == bin_idx)
+    az_dist /= max(az_dist)
+
+    invalid_bins = az_dist < 0.4  # TODO define threshold
+    total_invalid_bins = np.sum(invalid_bins)
+
+    vad_valid_status = False
+    if total_invalid_bins >= 3:
+        vad_valid_status = False
+    elif total_invalid_bins == 2:
+        # Get indices of low sample bins.
+        invalid_bins_idx = np.where(invalid_bins)
+        curr_idx = invalid_bins_idx[0][0]
+        next_idx = invalid_bins_idx[0][1]
+        # Invalidate VAD if low sample bins are neighbours.
+        if (next_idx == (curr_idx - 1) % len(invalid_bins)) or (next_idx == (curr_idx + 1) % len(invalid_bins)):
+            vad_valid_status = False
+        else:
+            vad_valid_status = True
+    else:
+        vad_valid_status = True
+
+    return vad_valid_status
+
+
+def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebugPlot):
     """
     :param signal_func:
     :param vad_ranges:
     :param radar_sp_table:
     :return:
     """
+    vad_mask = GetVADMask(radar_sp_table, echo_type)
+
     wind_profile_vad = []
     for height_vad in vad_ranges:
         range_diff = np.abs(radar_sp_table['height_bin_meters'] - height_vad)
@@ -69,6 +132,14 @@ def VADWindProfile(signal_func, vad_ranges, vad_mask, radar_sp_table, showDebugP
         mean_ref = np.mean(radar_sp_table['reflectivity'][idx_ref])
 
         wind_speed, wind_dir, fitted_points = fitVAD(az_cut, velocity_cut, signal_func, False)
+        if math.isnan(wind_dir):
+            vad_valid =  False
+        else:
+            vad_valid = IsVADDistributionValid(az_cut, wind_dir, echo_type)
+
+        if not vad_valid:
+            wind_speed, wind_dir, fitted_points = np.nan, np.nan, None
+
         wind_U = wind_speed * np.sin(wind_dir * np.pi / 180)
         wind_V = wind_speed * np.cos(wind_dir * np.pi / 180)
         wind_profile_vad.append([wind_speed, wind_dir, wind_U, wind_V, height_vad, len(velocity_cut), mean_ref])

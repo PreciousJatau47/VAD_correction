@@ -26,6 +26,7 @@ def read_info_from_radar_name(radar_file):
     ss = radar_file[17:19]
     return radar_name, year, month, day, hh, mm, ss
 
+
 def GetHcaPath(hca_day_folder, radar_file, hca_el, el_desc_hca):
     suffix = "".join(["SDUS84_", el_desc_hca[hca_el], "{}_{}{}{}{}"])
     hca_subfolder = el_desc_hca[hca_el]
@@ -43,6 +44,7 @@ def GetHcaPath(hca_day_folder, radar_file, hca_el, el_desc_hca):
             return os.path.join(target_folder, hca_file)
     return None  # file not found.
 
+
 def GetHcaVol(hca_day_folder, radar_file):
     el_desc_hca = {0.5: "N0H", 1.5: "N1H", 2.5: "N2H", 3.5: "N3H"}
     volume_hca = {}
@@ -50,6 +52,7 @@ def GetHcaVol(hca_day_folder, radar_file):
         volume_hca[el_hca] = pyart.io.read_nexrad_level3(GetHcaPath(hca_day_folder, radar_file, el_hca, el_desc_hca))
     print(volume_hca[el_hca].fields['radar_echo_classification']['options'])
     return volume_hca
+
 
 def ReadRadarSliceUpdate(radar, slice_idx):
     radar_range = radar.range['data'] / 1000  # in km
@@ -77,6 +80,7 @@ def ReadRadarSliceUpdate(radar, slice_idx):
 
     return radar_range, radar_az_deg, radar_el, data_slice.copy(), mask_slice.copy(), labels_slice, radar_mask
 
+
 def MatchGates(arr, key_arr):
     """
     :param arr:
@@ -91,6 +95,22 @@ def MatchGates(arr, key_arr):
         # print(i, ",", match_idxs[i])
         # print(arr[match_idxs[i]], "-", key_arr[i])
     return match_idxs
+
+
+def GetDataTableColorMap():
+    """
+    Keys are variable names, Values is a tuple containing the associated color map, map range, and number of bins.
+    :return:
+    """
+    return {'differential_phase': ('Theodore16', [0, 180], 10),
+            'reflectivity': ('NWSRef', [-25, 75], 10),
+            'differential_reflectivity': ('RefDiff', [-7.9, 7.9], 10),
+            'cross_correlation_ratio': ('RRate11', [0.2, 1.05], 10),
+            'velocity': ('NWSVel', [-37, 37], 10),
+            'hca': ('viridis', [0, 150], 16),
+            'hca_bio': ('viridis', [0, 1], 2),
+            'hca_weather': ('Spectral', [0, 1], 2),
+            'BIClass': ('viridis', [-1, 1], 3)}
 
 
 def VisualizeDataTable(data_table, color_map, output_folder):
@@ -114,6 +134,7 @@ def VisualizeDataTable(data_table, color_map, output_folder):
         output_path = output_folder + "\\" + product + ".png"
 
         # Select color map.
+        # TODO move building color map to GetDataTableColorMap
         if product == "hca" or product == "hca_bio" or product == "hca_weather" or product == "BIClass":
             cmap = plt.cm.get_cmap(color_map[product][0], color_map[product][2])
         else:
@@ -143,15 +164,17 @@ def VisualizeDataTable(data_table, color_map, output_folder):
         fig.subplots_adjust(right=0.8)
         cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
         fig.colorbar(im, cax=cbar_ax)
-        # plt.show()
-        plt.savefig(output_path, dpi=200)
-        plt.close(fig)
+        plt.show()
+        # plt.savefig(output_path, dpi=200)
+        # plt.close(fig)
     return
+
 
 # TODO mask_dp
 def MergeRadarAndHCAUpdate(radar, hca_volume, maxRange):
     # Define common grid
-    range_common = np.arange(10, maxRange, 0.25)
+    minRange = 10
+    range_common = np.arange(minRange, maxRange, 0.25)
     az_common = np.arange(0, 360, 0.5)
 
     # Number of radar sweeps.
@@ -200,7 +223,7 @@ def MergeRadarAndHCAUpdate(radar, hca_volume, maxRange):
             continue
 
         # Define common grid
-        range_common = np.arange(10, maxRange, 0.25)
+        range_common = np.arange(minRange, maxRange, 0.25)
         az_common = np.arange(0, 360, 0.5)
 
         # Get radar scan.
@@ -253,6 +276,7 @@ def MergeRadarAndHCAUpdate(radar, hca_volume, maxRange):
     data_table = pd.concat(data_tables, axis=0)
     # print(data_table.shape)
     return data_table
+
 
 def ReadRadarCutAsTableUpdate(radar, slice_idx):
     """
