@@ -18,10 +18,8 @@ plt.rc('font', **font)
 
 
 # TODO
-# Test: Reproduce profiles from Steph et al 2016
 # need check for if sounding is available.
 # Might need to tune for best availability threshold.
-
 
 def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_jobs, title_str, prop_str,
                    output_folder, save_plots):
@@ -41,7 +39,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
 
         ax[0].plot(wind_profile_vad["wind_direction"][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
                    color=blue_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
-                   label=description_jobs[job_id][0] + " dir")   # vad_jobs[job_idx] -> [job_id]
+                   label=description_jobs[job_id][0] + " dir")  # vad_jobs[job_idx] -> [job_id]
         ax[1].plot(wind_profile_vad["wind_speed"][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
                    color=red_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
                    label=description_jobs[job_id][0] + " spd")
@@ -170,17 +168,15 @@ def Main():
                       "longitude": radar.longitude['data'][0],
                       "height": radar.altitude['data'][0]}
 
-    radar_products_slice = {0: ["differential_reflectivity", "differential_phase", "cross_correlation_ratio"],
-                            1: ["reflectivity", "velocity", "spectrum_width"]}
     data_table = MergeRadarAndHCAUpdate(radar, hca_vol, 300)
 
-    # TODO get original ZDR mask.
+    # TODO Precious. Get original ZDR mask.
     data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
     data_table["hca_bio"] = data_table["hca"] == 10.0
     data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
     data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
 
-    height_binsize = 0.04  # 0.05
+    height_binsize = 0.04  # height bins in km
     data_table["height_bin_meters"] = (np.floor(
         data_table["height"] / height_binsize) + 1) * height_binsize - height_binsize / 2
     data_table["height_bin_meters"] *= 1000
@@ -192,7 +188,6 @@ def Main():
     X.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
     X.rename(columns={"differential_phase": "pdp"}, inplace=True)
     X.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
-
     data_table['BIClass'] = -1
     data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, bi_clf_file)
 
@@ -209,13 +204,11 @@ def Main():
     # vad_heights = np.array([480])
 
     vad_profiles_job = {}
-
     for vad_mask in vad_jobs:
-        # Select type of echoes for VAD.
         wind_profile_vad = VADWindProfile(signal_func, vad_heights, vad_mask, data_table, showDebugPlot=False)
         vad_profiles_job[vad_mask] = wind_profile_vad
 
-    ## Sounding wind profile. ##
+    # Sounding wind profile.
     year_sounding, month_sounding, ddhh_sounding = GetSoundingDateTimeFromRadarFile(radar_data_file)
     sounding_wind_df, sounding_location, sounding_url = GetSoundingWind(sounding_url_base, radar_data_file,
                                                                         location_radar,
@@ -227,7 +220,7 @@ def Main():
                                                    sounding_location["longitude"])
     distance_radar_sounding = round(distance_radar_sounding / 1000, 2)
 
-    # plots
+    # Plots.
     height_msk = data_table["height_bin_meters"] < max_height_VAD
     total_echoes = np.sum(np.logical_or(data_table["hca_bio"][height_msk], data_table["hca_weather"][height_msk]))
 
