@@ -23,7 +23,7 @@ plt.rc('font', **font)
 # Might need to tune for best availability threshold.
 
 
-def VisualizeWinds(vad_jobs, vad_profiles_job, sounding_wind_df, max_height, description_jobs, title_str, prop_str,
+def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_jobs, title_str, prop_str,
                    output_folder, save_plots):
     if not os.path.isdir(output_folder):
         os.makedirs(output_folder)
@@ -31,20 +31,22 @@ def VisualizeWinds(vad_jobs, vad_profiles_job, sounding_wind_df, max_height, des
     red_color_wheel = {VADMask.weather: "gold", VADMask.insects: "tomato", VADMask.birds: "lime"}
     blue_color_wheel = {VADMask.weather: "deepskyblue", VADMask.insects: "blueviolet", VADMask.birds: "cornflowerblue"}
 
+    # Plot for speed and direction.
     fig, ax = plt.subplots(1, 2)
-    # Radar wind components.
-    for job_idx in range(len(vad_jobs)):
-        wind_profile_vad = vad_profiles_job[job_idx]
+
+    # Radar speed and direction.
+    for job_id in vad_profiles_job.keys():
+        wind_profile_vad = vad_profiles_job[job_id]
         vad_height_idx = wind_profile_vad['height'] < max_height
 
         ax[0].plot(wind_profile_vad["wind_direction"][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
-                   color=blue_color_wheel[vad_jobs[job_idx]], marker=description_jobs[vad_jobs[job_idx]][1], alpha=0.5,
-                   label=description_jobs[vad_jobs[job_idx]][0] + " dir")
+                   color=blue_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
+                   label=description_jobs[job_id][0] + " dir")   # vad_jobs[job_idx] -> [job_id]
         ax[1].plot(wind_profile_vad["wind_speed"][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
-                   color=red_color_wheel[vad_jobs[job_idx]], marker=description_jobs[vad_jobs[job_idx]][1], alpha=0.5,
-                   label=description_jobs[vad_jobs[job_idx]][0] + " spd")
+                   color=red_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
+                   label=description_jobs[job_id][0] + " spd")
 
-    # Sounding wind components.
+    # Sounding speed and direction.
     sounding_height_idx = sounding_wind_df['HGHT'] < max_height
     ax[0].plot(sounding_wind_df["DRCT"][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
                label="sound dir", color="blue", linestyle='dashed')
@@ -64,25 +66,26 @@ def VisualizeWinds(vad_jobs, vad_profiles_job, sounding_wind_df, max_height, des
     if save_plots:
         plt.savefig(os.path.join(output_folder, "wind_comparison_spherical.png"))
 
+    # Plot for U and V wind components.
     plt.figure()
 
     # Mean reflectivity vs height.
-    wind_profile_vad = vad_profiles_job[0]
+    wind_profile_vad = vad_profiles_job[VADMask.insects]
     vad_height_idx = wind_profile_vad['height'] < max_height
     plt.plot(wind_profile_vad['mean_ref'][vad_height_idx], wind_profile_vad['height'][vad_height_idx], color='black',
              label="ref")
 
-    for job_idx in range(len(vad_jobs)):
-        wind_profile_vad = vad_profiles_job[job_idx]
+    for job_id in vad_profiles_job.keys():
+        wind_profile_vad = vad_profiles_job[job_id]
         vad_height_idx = wind_profile_vad['height'] < max_height
 
         # Radar wind components.
         plt.plot(wind_profile_vad['wind_U'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
-                 color=blue_color_wheel[vad_jobs[job_idx]], marker=description_jobs[vad_jobs[job_idx]][1], alpha=0.5,
-                 label=description_jobs[vad_jobs[job_idx]][0] + " vad_U")
+                 color=blue_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
+                 label=description_jobs[job_id][0] + " vad_U")
         plt.plot(wind_profile_vad['wind_V'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
-                 color=red_color_wheel[vad_jobs[job_idx]], marker=description_jobs[vad_jobs[job_idx]][1], alpha=0.5,
-                 label=description_jobs[vad_jobs[job_idx]][0] + " vad_V")
+                 color=red_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
+                 label=description_jobs[job_id][0] + " vad_V")
 
     # Sounding wind components.
     sounding_height_idx = sounding_wind_df['HGHT'] < max_height
@@ -205,12 +208,12 @@ def Main():
     vad_heights = np.arange(80, max_height_VAD, 40)
     # vad_heights = np.array([480])
 
-    vad_profiles_job = []
+    vad_profiles_job = {}
 
     for vad_mask in vad_jobs:
         # Select type of echoes for VAD.
         wind_profile_vad = VADWindProfile(signal_func, vad_heights, vad_mask, data_table, showDebugPlot=False)
-        vad_profiles_job.append(wind_profile_vad)
+        vad_profiles_job[vad_mask] = wind_profile_vad
 
     ## Sounding wind profile. ##
     year_sounding, month_sounding, ddhh_sounding = GetSoundingDateTimeFromRadarFile(radar_data_file)
@@ -246,7 +249,7 @@ def Main():
 
     description_jobs = {VADMask.biological: ("bio", "."), VADMask.insects: ("ins", "2"),
                         VADMask.weather: ("wea", "d"), VADMask.birds: ("bir", "^")}
-    VisualizeWinds(vad_jobs, vad_profiles_job, sounding_wind_df, 1000, description_jobs, title_str, prop_str,
+    VisualizeWinds(vad_profiles_job, sounding_wind_df, 1000, description_jobs, title_str, prop_str,
                    figure_folder, False)
 
 
