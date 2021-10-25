@@ -91,9 +91,6 @@ def MatchGates(arr, key_arr):
     for i in range(len(key_arr)):
         diff = list(np.abs(arr - key_arr[i]))
         match_idxs[i] = diff.index(min(diff))
-        # print(diff[i])
-        # print(i, ",", match_idxs[i])
-        # print(arr[match_idxs[i]], "-", key_arr[i])
     return match_idxs
 
 
@@ -151,8 +148,6 @@ def VisualizeDataTable(data_table, color_map, output_folder):
             im = ax[count_subplot // 2, count_subplot % 2].pcolor(x, y, data_grid, cmap=cmap,
                                                                   vmin=color_map[product][1][0],
                                                                   vmax=color_map[product][1][1])
-            # ax[count_subplot // 2, count_subplot % 2].set_xlabel('X [km]')
-            # ax[count_subplot // 2, count_subplot % 2].set_ylabel('Y [km]')
             ax[count_subplot // 2, count_subplot % 2].set_title(str(curr_el) + "$^{\circ}$.")
             count_subplot += 1
         fig.add_subplot(111, frameon=False)
@@ -164,7 +159,7 @@ def VisualizeDataTable(data_table, color_map, output_folder):
         fig.subplots_adjust(right=0.8)
         cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
         fig.colorbar(im, cax=cbar_ax)
-        plt.show()
+        # plt.show()
         # plt.savefig(output_path, dpi=200)
         # plt.close(fig)
     return
@@ -184,7 +179,6 @@ def MergeRadarAndHCAUpdate(radar, hca_volume, maxRange):
     for radar_sweep_idx in range(n_sweeps):
         radar_el = np.mean(radar.elevation['data'][radar.get_slice(radar_sweep_idx)])
         radar_el = round(radar_el / 0.5) * 0.5
-        # print(radar_el)
 
         # build radar + hca table if radar elevation matches hca elevation
         if radar_el in hca_volume.keys():
@@ -218,7 +212,6 @@ def MergeRadarAndHCAUpdate(radar, hca_volume, maxRange):
     # Merge tables from different elevations.
     data_tables = []
     for hca_el in hca_volume.keys():
-
         if slice_store[hca_el] == None:
             continue
 

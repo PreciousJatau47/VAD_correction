@@ -5,11 +5,9 @@ from bs4 import BeautifulSoup
 import urllib.request
 import numpy as np
 import matplotlib.pyplot as plt
-
 from HaverSineDistance import GetHaverSineDistance
 
 KNOT_T_MPS = 0.514444
-
 
 def GetSoundingDateTimeFromRadarFile(radar_file):
     year = radar_file[4:8]
