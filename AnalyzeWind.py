@@ -39,15 +39,19 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
 
         ax[0].plot(wind_profile_vad["wind_direction"][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
                    color=blue_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
-                   label=description_jobs[job_id][0] + " dir")  # vad_jobs[job_idx] -> [job_id]
+                   label=description_jobs[job_id][0] + " dir")
         ax[1].plot(wind_profile_vad["wind_speed"][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
                    color=red_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
                    label=description_jobs[job_id][0] + " spd")
 
     # Sounding speed and direction.
     sounding_height_idx = sounding_wind_df['HGHT'] < max_height
+    ax[0].scatter(sounding_wind_df["DRCT"][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
+                  marker='o', color="blue", alpha=0.5)
     ax[0].plot(sounding_wind_df["DRCT"][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
                label="sound dir", color="blue", linestyle='dashed')
+    ax[1].scatter(sounding_wind_df["SMPS"][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
+                  color="red", marker='o', alpha=0.5)
     ax[1].plot(sounding_wind_df["SMPS"][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
                label="Sound spd", color="red", linestyle='dashed')
 
@@ -87,6 +91,10 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
 
     # Sounding wind components.
     sounding_height_idx = sounding_wind_df['HGHT'] < max_height
+    plt.scatter(sounding_wind_df['windU'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
+                marker='o', color="blue", alpha=0.5)
+    plt.scatter(sounding_wind_df['windV'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
+                color="red", alpha=0.5)
     plt.plot(sounding_wind_df['windU'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
              label="wind_U", color="blue", linestyle='dashed')
     plt.plot(sounding_wind_df['windV'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
