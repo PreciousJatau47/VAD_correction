@@ -38,6 +38,8 @@ def GetAveragingWeights(x, x_key, left_part, right_part):
     w_right = (x_key - x[left_part]) / delta_x
     return w_left, w_right, delta_x
 
+WEIGHT_THRESHOLD = 0.80
+
 def WeightedMean(x_arr, x_key, left_part, right_part, y_arr, max_delta_x = None):
     """
     :param x_key: value around which to partition predictor variable.
@@ -47,7 +49,8 @@ def WeightedMean(x_arr, x_key, left_part, right_part, y_arr, max_delta_x = None)
     :return:
     """
     w_left, w_right, delta_x = GetAveragingWeights(x=x_arr, x_key=x_key, left_part=left_part, right_part=right_part)
-    if max_delta_x != None and delta_x > max_delta_x:
+
+    if max_delta_x != None and delta_x > max_delta_x and not (w_left > WEIGHT_THRESHOLD or w_right > WEIGHT_THRESHOLD):
         return np.nan
 
     return w_left * y_arr[left_part] + w_right * y_arr[right_part]
@@ -101,7 +104,7 @@ def Main():
 
     plt.show()
 
-Main()
+# Main()
 
 
 
