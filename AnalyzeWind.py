@@ -251,14 +251,8 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
     return df_interp
 
 
-def Main():
-    # Radar.
-    radar_data_file = "KOHX20180502_020640_V06"  # "KOHX20180506_231319_V06"
-    radar_data_folder = "./radar_data"
-    hca_data_folder = "./hca_data"
-    radar_t_sounding = {'KHTX': 'BNA', 'KTLX': 'LMN', 'KOHX': 'BNA'}
-    station_infos = {'LMN': ('74646', 'Lamont, Oklahoma'), 'BNA': ('72327', 'Nashville, Tennessee')}
-
+def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
+                norm_stats_file, clf_file, vad_jobs):
     # HCA.
     radar_base = radar_data_file[:12]
     radar_data_folder = os.path.join(radar_data_folder, radar_base)
@@ -270,17 +264,12 @@ def Main():
     station_desc = station_infos[radar_t_sounding[radar_name]][1]
     sounding_url_base = "http://weather.uwyo.edu/cgi-bin/sounding?region=naconf&TYPE=TEXT%3ALIST&YEAR={}&MONTH={}&FROM={}&TO={}&STNM={}"
 
-    sounding_log_dir = "./sounding_logs"
     if not os.path.isdir(sounding_log_dir):
         os.makedirs(sounding_log_dir)
 
     # Classification models.
-    bi_norm_stats_file = "./models/ridge_bi/mean_std_for_normalization_1.pkl"
-    bi_clf_file = "./models/ridge_bi/RidgeRegModels_SGD_1.pkl"
-
-    # VAD options
-    vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather]
-    # vad_jobs = [VADMask.insects]
+    bi_norm_stats_file = norm_stats_file
+    bi_clf_file = clf_file
 
     # Read HCA data.
     hca_vol = GetHcaVol(hca_data_folder, radar_data_file)
@@ -389,5 +378,29 @@ def Main():
     VisualizeWinds(vad_profiles_job_interp, sounding_wind_df_interp, 1100, description_jobs, title_str, prop_str,
                    figure_folder, False)
 
+    return vad_profiles_job_interp, sounding_wind_df_interp
+
+
+def Main():
+
+    # Radar/Sounding.
+    radar_data_file = "KOHX20180502_020640_V06"  # "KOHX20180506_231319_V06"
+    radar_data_folder = "./radar_data"
+    hca_data_folder = "./hca_data"
+    radar_t_sounding = {'KHTX': 'BNA', 'KTLX': 'LMN', 'KOHX': 'BNA'}
+    station_infos = {'LMN': ('74646', 'Lamont, Oklahoma'), 'BNA': ('72327', 'Nashville, Tennessee')}
+    sounding_log_dir = "./sounding_logs"
+
+    # Model.
+    norm_stats_file = "./models/ridge_bi/mean_std_for_normalization_1.pkl"
+    clf_file = "./models/ridge_bi/RidgeRegModels_SGD_1.pkl"
+
+    # VAD options
+    vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather]
+    # vad_jobs = [VADMask.insects]
+
+    vad_profiles, sounding_df = AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding,
+                                            station_infos, sounding_log_dir,
+                                            norm_stats_file, clf_file, vad_jobs)
 
 Main()
