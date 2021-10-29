@@ -244,7 +244,7 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
 
 
 def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
-                norm_stats_file, clf_file, vad_jobs):
+                norm_stats_file, clf_file, vad_jobs, match_radar_and_sounding_grid=True, save_wind_figure=False):
     # HCA.
     radar_base = radar_data_file[:12]
     radar_data_folder = os.path.join(radar_data_folder, radar_base)
@@ -331,19 +331,19 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     height_grid_interp = height_grid_interp[height_grid_interp < max_height]
 
     # Match, interpolate VAD and sounding grid
-    # TODO hide behind flag.
-    sounding_wind_df_interp = InterpolateSoundingWind(sounding_df=sounding_wind_df,
-                                                      height_grid_interp=height_grid_interp,
-                                                      max_height_diff=max_height_diff,
-                                                      max_height=max_height)
-    height_grid_interp = sounding_wind_df['HGHT']
-    height_grid_interp = height_grid_interp[height_grid_interp < max_height]
-    vad_profiles_job_interp = {}
-    for vad_mask in vad_jobs:
-        vad_profiles_job_interp[vad_mask] = InterpolateVADWind(vad_df=vad_profiles_job[vad_mask],
-                                                               height_grid_interp=height_grid_interp,
-                                                               max_height_diff=max_height_diff,
-                                                               max_height=max_height)
+    if match_radar_and_sounding_grid:
+        sounding_wind_df_interp = InterpolateSoundingWind(sounding_df=sounding_wind_df,
+                                                          height_grid_interp=height_grid_interp,
+                                                          max_height_diff=max_height_diff,
+                                                          max_height=max_height)
+        height_grid_interp = sounding_wind_df['HGHT']
+        height_grid_interp = height_grid_interp[height_grid_interp < max_height]
+        vad_profiles_job_interp = {}
+        for vad_mask in vad_jobs:
+            vad_profiles_job_interp[vad_mask] = InterpolateVADWind(vad_df=vad_profiles_job[vad_mask],
+                                                                   height_grid_interp=height_grid_interp,
+                                                                   max_height_diff=max_height_diff,
+                                                                   max_height=max_height)
 
     # Plots.
     height_msk = data_table["height_bin_meters"] < max_height_VAD
@@ -367,14 +367,18 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
 
     description_jobs = {VADMask.biological: ("bio", "."), VADMask.insects: ("ins", "2"),
                         VADMask.weather: ("wea", "d"), VADMask.birds: ("bir", "^")}
-    VisualizeWinds(vad_profiles_job_interp, sounding_wind_df_interp, 1100, description_jobs, title_str, prop_str,
-                   figure_folder, False)
 
-    return vad_profiles_job_interp, sounding_wind_df_interp
+    if match_radar_and_sounding_grid:
+        VisualizeWinds(vad_profiles_job_interp, sounding_wind_df_interp, 1100, description_jobs, title_str, prop_str,
+                       figure_folder, save_wind_figure)
+        return vad_profiles_job_interp, sounding_wind_df_interp
+
+    VisualizeWinds(vad_profiles_job, sounding_wind_df, 1100, description_jobs, title_str, prop_str,
+                   figure_folder, save_wind_figure)
+    return vad_profiles_job, sounding_wind_df
 
 
 def Main():
-
     # Radar/Sounding.
     radar_data_file = "KOHX20180502_020640_V06"  # "KOHX20180506_231319_V06"
     radar_data_folder = "./radar_data"
@@ -393,6 +397,7 @@ def Main():
 
     vad_profiles, sounding_df = AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding,
                                             station_infos, sounding_log_dir,
-                                            norm_stats_file, clf_file, vad_jobs)
+                                            norm_stats_file, clf_file, vad_jobs, match_radar_and_sounding_grid=True,
+                                            save_wind_figure=False)
 
 Main()
