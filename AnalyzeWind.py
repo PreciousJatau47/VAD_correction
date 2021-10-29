@@ -1,16 +1,8 @@
-import pyart
-import os
-import math
-import pickle
-import sys
-import time
-import numpy as np
-import matplotlib.pyplot as plt
-from SoundingDataUtils import *
-from VADUtils import fitVAD, VADWindProfile
-from RadarHCAUtils import *
 from InterpolateData import *
+from RadarHCAUtils import *
+from SoundingDataUtils import *
 from VADMaskEnum import VADMask
+from VADUtils import VADWindProfile
 
 font = {'family': 'DejaVu Sans',
         'weight': 'bold',
