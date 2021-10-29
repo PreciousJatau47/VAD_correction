@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from SoundingDataUtils import *
 from VADUtils import fitVAD, VADWindProfile
 from RadarHCAUtils import *
+from InterpolateData import *
 from VADMaskEnum import VADMask
 
 font = {'family': 'DejaVu Sans',
@@ -101,7 +102,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
              label="wind_V", color="red", linestyle='dashed')
 
     plt.ylim(0, 1.4 * max_height)
-    plt.xlim(-20, 20)
+    plt.xlim(-16, 23)
     plt.grid(True)
     plt.xlabel("Wind components [mps]")
     plt.ylabel("Height [m]")
@@ -134,6 +135,120 @@ def classify_echoes(X, bi_clf_path, bi_norm_stats=None):
     y_bi = bi_clf['model'].predict(X_bi)
 
     return y_bi
+
+
+def InterpolateWindComponents(windU, windV, height_grid, height_grid_interp, max_height_diff, max_height,
+                              show_debug_plot=False):
+    height_grid_interp = height_grid_interp[height_grid_interp < max_height]
+    windU_interp = Interpolate(x=height_grid, y=windU, x_interp=height_grid_interp, max_delta_x=max_height_diff)
+    windV_interp = Interpolate(x=height_grid, y=windV, x_interp=height_grid_interp, max_delta_x=max_height_diff)
+
+    # Impose max height.
+    # TODO Use idx_height for plots directly instead.
+    idx_height = height_grid < max_height
+    height_grid = height_grid[idx_height]
+    windU = windU[idx_height]
+    windV = windV[idx_height]
+
+    idx_height_vad = height_grid_interp < max_height
+    idx_valid = np.logical_not(np.logical_and(np.isnan(windU_interp), np.isnan(windV_interp)))
+    idx_valid = np.logical_and(idx_valid, idx_height_vad)
+
+    height_grid_interp = height_grid_interp[idx_valid]
+    windU_interp = windU_interp[idx_valid]
+    windV_interp = windV_interp[idx_valid]
+
+    if show_debug_plot:
+        # plot.
+        plt.figure()
+        plt.scatter(windU, height_grid, color='blue', alpha=0.5)
+        plt.scatter(windU_interp, height_grid_interp, color='red', alpha=0.5)
+        plt.plot(windU, height_grid, color='blue')
+        plt.ylim(0, max_height)
+        plt.title("U")
+
+        plt.figure()
+        plt.scatter(windV, height_grid, color='blue', alpha=0.5)
+        plt.scatter(windV_interp, height_grid_interp, color='red', alpha=0.5)
+        plt.plot(windV, height_grid, color='blue')
+        plt.ylim(0, max_height)
+        plt.title("V")
+
+        plt.figure()
+        plt.scatter(windU_interp, height_grid_interp, color='blue', label='U')
+        plt.scatter(windV_interp, height_grid_interp, color='red', label='V')
+        plt.legend()
+
+        plt.show()
+
+    return windU_interp, windV_interp, height_grid_interp
+
+
+def InterpolateSoundingWind(sounding_df, height_grid_interp, max_height_diff, max_height):
+    height_grid = sounding_df['HGHT']
+    windU = sounding_df['windU']
+    windV = sounding_df['windV']
+
+    windU_interp, windV_interp, height_grid_interp = InterpolateWindComponents(windU=windU, windV=windV,
+                                                                               height_grid=height_grid,
+                                                                               height_grid_interp=height_grid_interp,
+                                                                               max_height_diff=max_height_diff,
+                                                                               max_height=max_height)
+    idx_height = height_grid < max_height
+    height_grid = height_grid[idx_height]
+    windU = windU[idx_height]
+    windV = windV[idx_height]
+
+    height_grid_interp = height_grid.append(height_grid_interp, ignore_index=True)
+    windU_interp = windU.append(pd.Series(windU_interp), ignore_index=True)
+    windV_interp = windV.append(pd.Series(windV_interp), ignore_index=True)
+    df_interp = pd.DataFrame(
+        {'HGHT': height_grid_interp, 'windU': windU_interp, 'windV': windV_interp})
+
+    df_interp['TEMP'] = np.nan
+    df_interp['TEMP'][idx_height] = sounding_df['TEMP'][idx_height]
+    df_interp['DRCT'] = np.nan
+    df_interp['DRCT'][idx_height] = sounding_df['DRCT'][idx_height]
+    df_interp['SMPS'] = np.nan
+    df_interp['SMPS'][idx_height] = sounding_df['SMPS'][idx_height]
+    df_interp = df_interp.sort_values(by=['HGHT'])
+
+    return df_interp
+
+
+def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
+    height_grid = vad_df['height']
+    windU = vad_df['wind_U']
+    windV = vad_df['wind_V']
+
+    windU_interp, windV_interp, height_grid_interp = InterpolateWindComponents(windU=windU, windV=windV,
+                                                                               height_grid=height_grid,
+                                                                               height_grid_interp=height_grid_interp,
+                                                                               max_height_diff=max_height_diff,
+                                                                               max_height=max_height,
+                                                                               show_debug_plot=False)
+    idx_height = height_grid < max_height
+    height_grid = height_grid[idx_height]
+    windU = windU[idx_height]
+    windV = windV[idx_height]
+
+    height_grid_interp = height_grid.append(height_grid_interp, ignore_index=True)
+    windU_interp = windU.append(pd.Series(windU_interp), ignore_index=True)
+    windV_interp = windV.append(pd.Series(windV_interp), ignore_index=True)
+    df_interp = pd.DataFrame(
+        {'height': height_grid_interp, 'wind_U': windU_interp, 'wind_V': windV_interp})
+
+    df_interp['wind_speed'] = np.nan
+    df_interp.loc[range(len(vad_df)), 'wind_speed'] = vad_df['wind_speed']
+    df_interp['wind_direction'] = np.nan
+    df_interp.loc[range(len(vad_df)), 'wind_direction'] = vad_df['wind_direction']
+    df_interp['num_samples'] = np.nan
+    df_interp.loc[range(len(vad_df)), 'num_samples'] = vad_df['num_samples']
+    df_interp['mean_ref'] = np.nan
+    df_interp.loc[range(len(vad_df)), 'mean_ref'] = vad_df['mean_ref']
+    df_interp = df_interp.sort_values(by=['height'])
+
+    return df_interp
 
 
 def Main():
@@ -228,6 +343,27 @@ def Main():
                                                    sounding_location["longitude"])
     distance_radar_sounding = round(distance_radar_sounding / 1000, 2)
 
+    # Interpolate wind components.
+    max_height = 1100  # meters.
+    max_height_diff = 250  # meters.
+    height_grid_interp = wind_profile_vad['height']
+    height_grid_interp = height_grid_interp[height_grid_interp < max_height]
+
+    # Match, interpolate VAD and sounding grid
+    # TODO hide behind flag.
+    sounding_wind_df_interp = InterpolateSoundingWind(sounding_df=sounding_wind_df,
+                                                      height_grid_interp=height_grid_interp,
+                                                      max_height_diff=max_height_diff,
+                                                      max_height=max_height)
+    height_grid_interp = sounding_wind_df['HGHT']
+    height_grid_interp = height_grid_interp[height_grid_interp < max_height]
+    vad_profiles_job_interp = {}
+    for vad_mask in vad_jobs:
+        vad_profiles_job_interp[vad_mask] = InterpolateVADWind(vad_df=vad_profiles_job[vad_mask],
+                                                               height_grid_interp=height_grid_interp,
+                                                               max_height_diff=max_height_diff,
+                                                               max_height=max_height)
+
     # Plots.
     height_msk = data_table["height_bin_meters"] < max_height_VAD
     total_echoes = np.sum(np.logical_or(data_table["hca_bio"][height_msk], data_table["hca_weather"][height_msk]))
@@ -250,7 +386,7 @@ def Main():
 
     description_jobs = {VADMask.biological: ("bio", "."), VADMask.insects: ("ins", "2"),
                         VADMask.weather: ("wea", "d"), VADMask.birds: ("bir", "^")}
-    VisualizeWinds(vad_profiles_job, sounding_wind_df, 1000, description_jobs, title_str, prop_str,
+    VisualizeWinds(vad_profiles_job_interp, sounding_wind_df_interp, 1100, description_jobs, title_str, prop_str,
                    figure_folder, False)
 
 
