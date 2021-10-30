@@ -26,6 +26,29 @@ def read_info_from_radar_name(radar_file):
     ss = radar_file[17:19]
     return radar_name, year, month, day, hh, mm, ss
 
+def GetHcaPathFromFileList(hca_day_folder, radar_file, hca_el, el_desc_hca, filelist):
+    suffix = "".join(["SDUS84_", el_desc_hca[hca_el], "{}_{}{}{}{}"])
+
+    radar_name = radar_file[:4]
+    year = radar_file[4:8]
+    month = radar_file[8:10]
+    day = radar_file[10:12]
+    hhmm = radar_file[13:17]
+    suffix = suffix.format(radar_name[1:], year, month, day, hhmm)
+
+    if suffix in filelist.keys():
+        target_folder = os.path.join(hca_day_folder, filelist[suffix])
+        return target_folder
+    return None  # file not found.
+
+def GetHcaVolFromFileList(hca_day_folder, radar_file, filelist):
+    el_desc_hca = {0.5: "N0H", 1.5: "N1H", 2.5: "N2H", 3.5: "N3H"}
+    volume_hca = {}
+    for el_hca in el_desc_hca.keys():
+        volume_hca[el_hca] = pyart.io.read_nexrad_level3(
+            GetHcaPathFromFileList(hca_day_folder, radar_file, el_hca, el_desc_hca, filelist))
+    print(volume_hca[el_hca].fields['radar_echo_classification']['options'])
+    return volume_hca
 
 def GetHcaPath(hca_day_folder, radar_file, hca_el, el_desc_hca):
     suffix = "".join(["SDUS84_", el_desc_hca[hca_el], "{}_{}{}{}{}"])
