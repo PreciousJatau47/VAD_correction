@@ -1,4 +1,5 @@
 import os
+import fnmatch
 import pickle
 from RadarHCAUtils import *
 
@@ -30,13 +31,47 @@ def GetFileListL3(batch_folder_path):
 
     return filelist_dic
 
+def GetFileListRadar(batch_folder_path, start_day, stop_day, date_pattern):
+    file_obj = open(os.path.join(batch_folder_path, 'fileList.txt'), 'r')
+    filelists = file_obj.read().splitlines()
+    file_obj.close()
+
+    filelist_dic = {}
+    # Get the radar filename.
+    key_fn = lambda x: os.path.splitext(os.path.split(x)[1])[0]
+
+    for current_day in range(start_day, stop_day+1):
+        current_day_str = '0' + str(current_day) if current_day < 10 else str(current_day)
+        pattern = date_pattern.format(current_day_str)
+        filtered_files = fnmatch.filter(filelists, pattern)
+        filtered_files.sort(key=key_fn)
+        filelist_dic[pattern[1:-1]] = filtered_files
+
+    return filelist_dic
+
 def Main():
     level3_folder = "./level3_data"
-    batch_folder = "20180501_20180515"
-    batch_folder_path = os.path.join(level3_folder,batch_folder)
-    filelist_dic = GetFileListL3(batch_folder_path)
+    radar_folder = "./radar_data"
+    batch_folder = "KOHX_20180501_20180515"
+    batch_folder_path_l3 = os.path.join(level3_folder , batch_folder)
+    batch_folder_path_radar = os.path.join(radar_folder, batch_folder)
 
-    radar_data_file = "KOHX20180502_020640_V06"    # TODO obtain from filelist
-    hca_vol = GetHcaVolFromFileList(batch_folder_path, radar_data_file, filelist_dic)
+    date_pattern = "*KOHX201805{}*"
+    radar_scans_day = GetFileListRadar(batch_folder_path_radar, start_day=1, stop_day=2, date_pattern=date_pattern)
+    l3_files_dic = GetFileListL3(batch_folder_path_l3)
+
+    days = list(radar_scans_day.keys())
+    days.sort()
+
+    curr_day = days[0]  # TODO to be iterated over.
+
+    radar_subpath = radar_scans_day[curr_day][0]    # TODO to be iterated over.
+    print(radar_subpath)
+
+    radar_filename = os.path.splitext(os.path.split(radar_subpath)[1])[0]
+    print(radar_filename)
+
+    hca_vol = GetHcaVolFromFileList(batch_folder_path_l3, radar_filename, l3_files_dic)
+
 
 Main()
