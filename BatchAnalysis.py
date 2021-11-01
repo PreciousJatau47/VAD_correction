@@ -2,7 +2,7 @@ import os
 import pickle
 from RadarHCAUtils import *
 
-def GetFileList(batch_folder_path):
+def GetFileListL3(batch_folder_path):
     """
     :param batch_folder_path:
     :return:
@@ -21,7 +21,8 @@ def GetFileList(batch_folder_path):
 
         filelist_dic = {}
         for line in filelists:
-            filelist_dic[line[10:]] = line
+            idx_first_underscore = line.find('_')
+            filelist_dic[line[idx_first_underscore + 1:]] = line
 
         p_out = open(batch_filelist_dict_path, "wb")
         pickle.dump(filelist_dic, p_out)
@@ -33,7 +34,7 @@ def Main():
     level3_folder = "./level3_data"
     batch_folder = "20180501_20180515"
     batch_folder_path = os.path.join(level3_folder,batch_folder)
-    filelist_dic = GetFileList(batch_folder_path)
+    filelist_dic = GetFileListL3(batch_folder_path)
 
     radar_data_file = "KOHX20180502_020640_V06"    # TODO obtain from filelist
     hca_vol = GetHcaVolFromFileList(batch_folder_path, radar_data_file, filelist_dic)
