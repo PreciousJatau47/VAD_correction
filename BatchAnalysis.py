@@ -135,7 +135,6 @@ def Main():
             bird_count_scan.append(num_birds)
             insect_count_scan.append(num_insects)
             weather_count_scan.append(num_weather)
-            break
 
         echo_count_scan = {VADMask.birds: bird_count_scan, VADMask.insects: insect_count_scan,
                            VADMask.weather: weather_count_scan}
