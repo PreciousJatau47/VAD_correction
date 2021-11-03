@@ -96,7 +96,7 @@ def Main():
     level3_folder = "./level3_data"
     radar_folder = "./radar_data"
     # TODO add logic to prevent overwriting existing logs.
-    is_output_logged = False
+    force_output_logging = True
     output_log_dir = "./analysis_output_logs"
 
     batch_folder = "KOHX_20180501_20180515"
@@ -135,13 +135,15 @@ def Main():
             bird_count_scan.append(num_birds)
             insect_count_scan.append(num_insects)
             weather_count_scan.append(num_weather)
+            break
 
         echo_count_scan = {VADMask.birds: bird_count_scan, VADMask.insects: insect_count_scan,
                            VADMask.weather: weather_count_scan}
         result = (radar_scans, echo_count_scan)
 
-        if is_output_logged:
-            with open(os.path.join(output_log_dir, ''.join([curr_day, "_echo_count.pkl"])), 'wb') as p_out:
+        output_log_path = os.path.join(output_log_dir, ''.join([curr_day, "_echo_count.pkl"]))
+        if force_output_logging or (not os.path.exists(output_log_path)):
+            with open(output_log_path, 'wb') as p_out:
                 pickle.dump(result, p_out)
             p_out.close()
 
