@@ -71,6 +71,13 @@ def VisualizeEchoDistributionForOneDay(day, file_base, log_dir, normalize_counts
     plt.close()
 
 
+def VisualizeEchoDistributionForMultipleDays(start_day, stop_day, file_base, log_dir, normalize_counts, save_fig,
+                                             output_figure_dir):
+    for day in range(start_day, stop_day + 1):
+        print("Visualizing day ", str(day), '....')
+        VisualizeEchoDistributionForOneDay(day, file_base, log_dir, normalize_counts, save_fig, output_figure_dir)
+
+
 # TODO
 # monthly average
 def Main():
@@ -85,9 +92,9 @@ def Main():
     if not os.path.isdir(output_figure_dir):
         os.makedirs(output_figure_dir)
 
-    for day in range(start_day, stop_day+1):
-        print("Visualizing day ", str(day),'....')
-        VisualizeEchoDistributionForOneDay(day, file_base, log_dir, normalize_counts, save_fig, output_figure_dir)
+    VisualizeEchoDistributionForMultipleDays(start_day, stop_day, file_base, log_dir, normalize_counts, save_fig,
+                                             output_figure_dir)
+
 
 
 Main()
