@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 font = {'family': 'DejaVu Sans',
         'weight': 'bold',
-        'size': 11}
+        'size': 12}
 plt.rc('font', **font)
 
 
@@ -51,16 +51,16 @@ def VisualizeEchoDistributionForOneDay(day, file_base, log_dir, normalize_counts
         weather_count_scan = np.divide(weather_count_scan, total_count_scan)
 
     plt.figure()
-    plt.plot(time_hour, bird_count_scan, color='blue', label="bird")
-    plt.plot(time_hour, insect_count_scan, color='red', label="insect")
-    plt.plot(time_hour, weather_count_scan, color='green', label="weather")
+    plt.plot(time_hour, weather_count_scan, color='green', label="weather", linestyle='dashed')
+    plt.plot(time_hour, insect_count_scan, color='red', label="insects")
+    plt.plot(time_hour, bird_count_scan, color='blue', label="birds")
     # plt.xticks(np.arange(1,24))
     plt.xlim(0, 24)
     if normalize_counts:
         plt.ylim(0, 1.2)
-        plt.ylabel('Relative proportion')
+        plt.ylabel('Relative proportion [no unit]')
     else:
-        plt.ylabel("Echo count")
+        plt.ylabel("Echo count [no unit]")
     plt.xlabel("UTC Time [hrs]")
     plt.title(output_figure_name)
     plt.grid(True)
@@ -78,23 +78,139 @@ def VisualizeEchoDistributionForMultipleDays(start_day, stop_day, file_base, log
         VisualizeEchoDistributionForOneDay(day, file_base, log_dir, normalize_counts, save_fig, output_figure_dir)
 
 
-# TODO
-# monthly average
+def AccumulateResults(start_day, stop_day, file_base, log_dir, normalize_counts):
+    # Define analysis grid (day * time hour)
+    time_hour_step = 0.5
+    time_hour_grid = np.arange(0, 24 + time_hour_step, time_hour_step)
+    day_grid = list(range(start_day, stop_day + 1))
+
+    # Initialize echo counts for batch analysis
+    echo_counts_batch = {}
+    echo_counts_batch[VADMask.insects] = np.zeros((len(day_grid), len(time_hour_grid)))
+    echo_counts_batch[VADMask.birds] = np.zeros((len(day_grid), len(time_hour_grid)))
+    echo_counts_batch[VADMask.weather] = np.zeros((len(day_grid), len(time_hour_grid)))
+
+    # Invalidate 0 bucket. All time in the range (0,0.499) are mapped to the 0.5 bucket.
+    echo_counts_batch[VADMask.insects][:, 0] = np.nan
+    echo_counts_batch[VADMask.birds][:, 0] = np.nan
+    echo_counts_batch[VADMask.weather][:, 0] = np.nan
+
+    for i in range(len(day_grid)):
+        # Load result.
+        day = day_grid[i]
+        day = '0' + str(day) if day < 10 else str(day)
+        log_file = file_base.format(day)
+
+        log_file_path = os.path.join(log_dir, log_file)
+        with open(log_file_path, "rb") as p_in:
+            result = pickle.load(p_in)
+        p_in.close()
+
+        # Get timestamps.
+        time_hour = [GetTimeHourUTC(some_str) for some_str in result[0]]
+
+        # Accumulate results for time period defined by day grid.
+        prev_idx = -1
+        idx_count = 0
+        for j in range(len(time_hour)):
+
+            # Skip nan entries.
+            if math.isnan(result[1][VADMask.insects][j]):
+                continue
+
+            idx = int(math.ceil(time_hour[j] / 0.5))
+
+            if prev_idx == -1 or idx == prev_idx:
+                idx_count += 1
+            else:
+                # Calculate average for the past 0.5 hour.
+                echo_counts_batch[VADMask.insects][i][prev_idx] /= idx_count
+                echo_counts_batch[VADMask.birds][i][prev_idx] /= idx_count
+                echo_counts_batch[VADMask.weather][i][prev_idx] /= idx_count
+                idx_count = 1
+
+            if normalize_counts:
+                echo_total = result[1][VADMask.insects][j] + result[1][VADMask.birds][j] + result[1][VADMask.weather][j]
+
+                echo_counts_batch[VADMask.insects][i][idx] = echo_counts_batch[VADMask.insects][i][idx] + \
+                                                             result[1][VADMask.insects][j] / echo_total
+                echo_counts_batch[VADMask.birds][i][idx] = echo_counts_batch[VADMask.birds][i][idx] + \
+                                                           result[1][VADMask.birds][j] / echo_total
+                echo_counts_batch[VADMask.weather][i][idx] = echo_counts_batch[VADMask.weather][i][idx] + \
+                                                             result[1][VADMask.weather][j] / echo_total
+            else:
+                echo_counts_batch[VADMask.insects][i][idx] = echo_counts_batch[VADMask.insects][i][idx] + \
+                                                             result[1][VADMask.insects][j]
+                echo_counts_batch[VADMask.birds][i][idx] = echo_counts_batch[VADMask.birds][i][idx] + \
+                                                           result[1][VADMask.birds][j]
+                echo_counts_batch[VADMask.weather][i][idx] = echo_counts_batch[VADMask.weather][i][idx] + \
+                                                             result[1][VADMask.weather][j]
+            prev_idx = idx
+
+        # Calculate average for last 0.5 hour.
+        echo_counts_batch[VADMask.insects][i][prev_idx] /= idx_count
+        echo_counts_batch[VADMask.birds][i][prev_idx] /= idx_count
+        echo_counts_batch[VADMask.weather][i][prev_idx] /= idx_count
+
+    return echo_counts_batch, day_grid, time_hour_grid
+
+
 def Main():
     log_dir = './analysis_output_logs'
-    file_base = 'KOHX201805{}_echo_count.pkl'
+    radar_name = 'KOHX'
+    file_base = 'KOHX{}{}{}_echo_count.pkl'
+    month = 5
+    year = 2018
     start_day = 1
     stop_day = 15
     normalize_counts = True
-    save_fig = True
+    save_fig = False
     output_figure_dir = './figures/KOHX_20180501_20180515'
+
+    month_num_t_name = {'01': 'January',
+                        '02': 'February',
+                        '03': 'March',
+                        '04': 'April',
+                        '05': 'May',
+                        '06': 'June',
+                        '07': 'July',
+                        '08': 'August',
+                        '09': 'September',
+                        '10': 'October',
+                        '11': 'November',
+                        '12': 'December'}
+
+    month_str = ''.join(['0', str(month)]) if month < 10 else str(month)
+    file_base = ''.join([radar_name, str(year), month_str, '{}_echo_count.pkl'])
 
     if not os.path.isdir(output_figure_dir):
         os.makedirs(output_figure_dir)
 
-    VisualizeEchoDistributionForMultipleDays(start_day, stop_day, file_base, log_dir, normalize_counts, save_fig,
-                                             output_figure_dir)
+    # VisualizeEchoDistributionForMultipleDays(start_day, stop_day, file_base, log_dir, normalize_counts, save_fig,
+    #                                          output_figure_dir)
 
+    echo_counts_batch, day_grid, time_hour_grid = AccumulateResults(start_day, stop_day, file_base, log_dir,
+                                                                    normalize_counts)
+
+    bird_stats_reduced = np.nanmean(echo_counts_batch[VADMask.birds], axis=0)
+    insect_stats_reduced = np.nanmean(echo_counts_batch[VADMask.insects], axis=0)
+    weather_stats_reduced = np.nanmean(echo_counts_batch[VADMask.weather], axis=0)
+
+    plt.figure()
+    plt.plot(time_hour_grid, weather_stats_reduced, color='green', label='weather', linestyle='dashed')
+    plt.plot(time_hour_grid, bird_stats_reduced, color='blue', label='birds')
+    plt.plot(time_hour_grid, insect_stats_reduced, color='red', label='insects')
+    plt.xlim(0, 24)
+    plt.ylim(0, 1)
+    plt.xlabel('UTC Time [hrs]')
+    plt.ylabel('Relative proportion [no unit]')
+    # TODO Automate title.
+    plt.title("Average for May 1-15, 2018.")
+    plt.grid(True)
+    plt.legend()
+    if save_fig:
+        plt.savefig(os.path.join(output_figure_dir, 'Average.png'), dpi=200)
+    plt.show()
 
 
 Main()
