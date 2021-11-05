@@ -25,6 +25,21 @@ def GetTimeHourLocal(some_str: str, utc_t_local: int) -> float:
     return GetTimeHourUTC(some_str) + utc_t_local
 
 
+def GetMonthNumberToName():
+    return {'01': 'January',
+            '02': 'February',
+            '03': 'March',
+            '04': 'April',
+            '05': 'May',
+            '06': 'June',
+            '07': 'July',
+            '08': 'August',
+            '09': 'September',
+            '10': 'October',
+            '11': 'November',
+            '12': 'December'}
+
+
 def VisualizeEchoDistributionForOneDay(day, file_base, log_dir, normalize_counts, save_fig, output_figure_dir):
     day = '0' + str(day) if day < 10 else str(day)
     log_file = file_base.format(day)
@@ -167,21 +182,12 @@ def Main():
     save_fig = False
     output_figure_dir = './figures/KOHX_20180501_20180515'
 
-    month_num_t_name = {'01': 'January',
-                        '02': 'February',
-                        '03': 'March',
-                        '04': 'April',
-                        '05': 'May',
-                        '06': 'June',
-                        '07': 'July',
-                        '08': 'August',
-                        '09': 'September',
-                        '10': 'October',
-                        '11': 'November',
-                        '12': 'December'}
+    month_num_t_name = GetMonthNumberToName()
 
     month_str = ''.join(['0', str(month)]) if month < 10 else str(month)
     file_base = ''.join([radar_name, str(year), month_str, '{}_echo_count.pkl'])
+    plot_title_str = ''.join(
+        ['Average for ', month_num_t_name[month_str], ', ', str(start_day), ' - ', str(stop_day), ', ', str(year), '.'])
 
     if not os.path.isdir(output_figure_dir):
         os.makedirs(output_figure_dir)
@@ -204,8 +210,7 @@ def Main():
     plt.ylim(0, 1)
     plt.xlabel('UTC Time [hrs]')
     plt.ylabel('Relative proportion [no unit]')
-    # TODO Automate title.
-    plt.title("Average for May 1-15, 2018.")
+    plt.title(plot_title_str)
     plt.grid(True)
     plt.legend()
     if save_fig:
