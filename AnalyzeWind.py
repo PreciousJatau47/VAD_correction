@@ -245,11 +245,15 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
 
 def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
                 norm_stats_file, clf_file, vad_jobs, figure_dir, match_radar_and_sounding_grid=True,
-                save_wind_figure=False, radar = None, hca_vol = None, data_table = None):
+                save_wind_figure=False, radar = None, hca_vol = None, data_table = None, l3_filelist = None):
+
+    radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
+
     # HCA.
-    radar_base = radar_data_file[:12]
-    radar_data_folder = os.path.join(radar_data_folder, radar_base)
-    hca_data_folder = os.path.join(hca_data_folder, radar_base)
+    if l3_filelist is None:
+        radar_base = radar_data_file[:12]
+        radar_data_folder = os.path.join(radar_data_folder, radar_base)
+        hca_data_folder = os.path.join(hca_data_folder, radar_base)
 
     # Sounding.
     radar_name, year, month, day, hh, mm, ss = read_info_from_radar_name(radar_data_file)
@@ -266,7 +270,10 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
 
     # Read HCA data.
     if hca_vol is None:
-        hca_vol = GetHcaVol(hca_data_folder, radar_data_file)
+        if l3_filelist is None:
+            hca_vol = GetHcaVol(hca_data_folder, radar_data_file_no_ext)
+        else:
+            hca_vol = GetHcaVolFromFileList(hca_data_folder, radar_data_file_no_ext, l3_filelist)
 
     # Read radar data.
     if radar is None:
@@ -407,4 +414,4 @@ def Main():
                                             match_radar_and_sounding_grid=True,
                                             save_wind_figure=False)
 
-Main()
+# Main()
