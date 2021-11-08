@@ -244,7 +244,7 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
 
 
 def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
-                norm_stats_file, clf_file, vad_jobs, match_radar_and_sounding_grid=True, save_wind_figure=False):
+                norm_stats_file, clf_file, vad_jobs, figure_dir, match_radar_and_sounding_grid=True, save_wind_figure=False):
     # HCA.
     radar_base = radar_data_file[:12]
     radar_data_folder = os.path.join(radar_data_folder, radar_base)
@@ -298,7 +298,6 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     # Visualize data table.
     color_map = GetDataTableColorMap()
     color_map = {'BIClass': ('viridis', [-1, 1], 3)}
-    figure_folder = os.path.join('./figures', radar_base)
     # VisualizeDataTable(data_table, color_map, figure_folder)
 
     # VAD wind profile
@@ -370,11 +369,11 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
 
     if match_radar_and_sounding_grid:
         VisualizeWinds(vad_profiles_job_interp, sounding_wind_df_interp, 1100, description_jobs, title_str, prop_str,
-                       figure_folder, save_wind_figure)
+                       figure_dir, save_wind_figure)
         return vad_profiles_job_interp, sounding_wind_df_interp
 
     VisualizeWinds(vad_profiles_job, sounding_wind_df, 1100, description_jobs, title_str, prop_str,
-                   figure_folder, save_wind_figure)
+                   figure_dir, save_wind_figure)
     return vad_profiles_job, sounding_wind_df
 
 
@@ -395,9 +394,11 @@ def Main():
     vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather]
     # vad_jobs = [VADMask.insects]
 
+    figure_dir = os.path.join('./figures', radar_data_file[:12])
+
     vad_profiles, sounding_df = AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding,
                                             station_infos, sounding_log_dir,
-                                            norm_stats_file, clf_file, vad_jobs, match_radar_and_sounding_grid=True,
-                                            save_wind_figure=False)
+                                            norm_stats_file, clf_file, vad_jobs,figure_dir=figure_dir, match_radar_and_sounding_grid=True,
+                                            save_wind_figure=True)
 
 Main()
