@@ -244,7 +244,8 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
 
 
 def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
-                norm_stats_file, clf_file, vad_jobs, figure_dir, match_radar_and_sounding_grid=True, save_wind_figure=False):
+                norm_stats_file, clf_file, vad_jobs, figure_dir, match_radar_and_sounding_grid=True,
+                save_wind_figure=False, radar = None, hca_vol = None, data_table = None):
     # HCA.
     radar_base = radar_data_file[:12]
     radar_data_folder = os.path.join(radar_data_folder, radar_base)
@@ -264,15 +265,19 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     bi_clf_file = clf_file
 
     # Read HCA data.
-    hca_vol = GetHcaVol(hca_data_folder, radar_data_file)
+    if hca_vol is None:
+        hca_vol = GetHcaVol(hca_data_folder, radar_data_file)
 
     # Read radar data.
-    radar = pyart.io.read(os.path.join(radar_data_folder, radar_data_file))
+    if radar is None:
+        radar = pyart.io.read(os.path.join(radar_data_folder, radar_data_file))
+
     location_radar = {"latitude": radar.latitude['data'][0],
                       "longitude": radar.longitude['data'][0],
                       "height": radar.altitude['data'][0]}
 
-    data_table = MergeRadarAndHCAUpdate(radar, hca_vol, 300)
+    if data_table is None:
+        data_table = MergeRadarAndHCAUpdate(radar, hca_vol, 300)
 
     # TODO Precious. Get original ZDR mask.
     data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
@@ -398,7 +403,8 @@ def Main():
 
     vad_profiles, sounding_df = AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding,
                                             station_infos, sounding_log_dir,
-                                            norm_stats_file, clf_file, vad_jobs,figure_dir=figure_dir, match_radar_and_sounding_grid=True,
-                                            save_wind_figure=True)
+                                            norm_stats_file, clf_file, vad_jobs, figure_dir=figure_dir,
+                                            match_radar_and_sounding_grid=True,
+                                            save_wind_figure=False)
 
 Main()
