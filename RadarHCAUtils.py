@@ -26,6 +26,7 @@ def read_info_from_radar_name(radar_file):
     ss = radar_file[17:19]
     return radar_name, year, month, day, hh, mm, ss
 
+
 def GetHcaPathFromFileList(hca_day_folder, radar_file, hca_el, el_desc_hca, filelist):
     suffix = "".join(["SDUS84_", el_desc_hca[hca_el], "{}_{}{}{}{}"])
 
@@ -41,6 +42,7 @@ def GetHcaPathFromFileList(hca_day_folder, radar_file, hca_el, el_desc_hca, file
         return target_folder
     return None  # file not found.
 
+
 def GetHcaVolFromFileList(hca_day_folder, radar_file, filelist):
     el_desc_hca = {0.5: "N0H", 1.5: "N1H", 2.5: "N2H", 3.5: "N3H"}
     volume_hca = {}
@@ -49,6 +51,7 @@ def GetHcaVolFromFileList(hca_day_folder, radar_file, filelist):
             GetHcaPathFromFileList(hca_day_folder, radar_file, el_hca, el_desc_hca, filelist))
     print(volume_hca[el_hca].fields['radar_echo_classification']['options'])
     return volume_hca
+
 
 def GetHcaPath(hca_day_folder, radar_file, hca_el, el_desc_hca):
     suffix = "".join(["SDUS84_", el_desc_hca[hca_el], "{}_{}{}{}{}"])
@@ -117,7 +120,7 @@ def MatchGates(arr, key_arr):
     return match_idxs
 
 
-def GetDataTableColorMap():
+def GetDataTableColorMapInfo():
     """
     Keys are variable names, Values is a tuple containing the associated color map, map range, and number of bins.
     :return:
@@ -131,6 +134,23 @@ def GetDataTableColorMap():
             'hca_bio': ('viridis', [0, 1], 2),
             'hca_weather': ('Spectral', [0, 1], 2),
             'BIClass': ('viridis', [-1, 1], 3)}
+
+
+def GetDataTableColorMap():
+    cmap_info = GetDataTableColorMapInfo()
+    cmap = {}
+    pyart_products = {'differential_phase', 'reflectivity', 'differential_reflectivity', 'cross_correlation_ratio',
+                      'velocity'}
+
+    for key in cmap_info.keys():
+        if key in pyart_products:
+            cmap[key] = (pyart.graph.cm._generate_cmap(cmap_info[key][0], cmap_info[key][2]), cmap_info[key][1])
+        elif key == 'BIClass':
+            # TODO replace with custom color map
+            cmap[key] = (plt.cm.get_cmap(cmap_info[key][0], cmap_info[key][2]), cmap_info[key][1])
+        else:
+            cmap[key] = (plt.cm.get_cmap(cmap_info[key][0], cmap_info[key][2]), cmap_info[key][1])
+    return cmap
 
 
 def VisualizeDataTable(data_table, color_map, output_folder):
@@ -183,7 +203,7 @@ def VisualizeDataTable(data_table, color_map, output_folder):
         cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
         fig.colorbar(im, cax=cbar_ax)
         # plt.show()
-        # plt.savefig(output_path, dpi=200)
+        plt.savefig(output_path, dpi=200)
         # plt.close(fig)
     return
 
