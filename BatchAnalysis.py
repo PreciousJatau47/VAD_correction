@@ -89,15 +89,23 @@ def GetClfEchoDistribution(batch_folder_path_radar, radar_subpath, batch_folder_
     data_table['BIClass'] = -1
     data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file)
 
-    return np.sum(data_table['BIClass'] == 1), np.sum(data_table['BIClass'] == 0), np.sum(data_table['hca_weather'])
+    return np.sum(data_table['BIClass'] == 1), np.sum(data_table['BIClass'] == 0), np.sum(
+        data_table['hca_weather']), radar_obj, hca_vol, data_table
 
+def GetTimeHourUTC(some_str: str) -> float:
+    idx_timestart = some_str.find('_') + 1
+    hh = some_str[idx_timestart:idx_timestart + 2]
+    mm = some_str[idx_timestart + 2:idx_timestart + 4]
+    ss = some_str[idx_timestart + 4:idx_timestart + 6]
+    time_hour = float(hh) + float(mm) / 60 + float(ss) / 3600
+    return time_hour
 
 def Main():
     level3_folder = "./level3_data"
     radar_folder = "./radar_data"
-    # TODO add logic to prevent overwriting existing logs.
-    force_output_logging = True
+    force_output_logging = False
     output_log_dir = "./analysis_output_logs"
+    figure_dir = './figures'
 
     batch_folder = "KOHX_20180501_20180515"
     date_pattern = "*KOHX201805{}*_V06.*"
@@ -108,6 +116,15 @@ def Main():
     # Model.
     norm_stats_file = "./models/ridge_bi/mean_std_for_normalization_1.pkl"
     clf_file = "./models/ridge_bi/RidgeRegModels_SGD_1.pkl"
+
+    # Wind analysis.
+    radar_t_sounding = {'KHTX': 'BNA', 'KTLX': 'LMN', 'KOHX': 'BNA'}
+    station_infos = {'LMN': ('74646', 'Lamont, Oklahoma'), 'BNA': ('72327', 'Nashville, Tennessee')}
+    sounding_log_dir = "./sounding_logs"
+    vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather]
+    delta_time_hr = 1 / 6
+    time_window = {'noon': (12 - delta_time_hr, 12 + delta_time_hr),
+                   'midnight': (24 - delta_time_hr, (24 + delta_time_hr) % 24)}
 
     batch_folder_path_l3 = os.path.join(level3_folder, batch_folder)
     batch_folder_path_radar = os.path.join(radar_folder, batch_folder)
@@ -129,12 +146,38 @@ def Main():
         weather_count_scan = []
 
         for radar_subpath in radar_scans:  # Takes ~5 seconds for 1 scan
-            num_birds, num_insects, num_weather = GetClfEchoDistribution(batch_folder_path_radar, radar_subpath,
-                                                                         batch_folder_path_l3, l3_files_dic, max_range,
-                                                                         clf_file)
-            bird_count_scan.append(num_birds)
-            insect_count_scan.append(num_insects)
-            weather_count_scan.append(num_weather)
+            # Echo distribution.
+            n_birds, n_insects, n_weather, radar_obj, hca_vol, data_table = GetClfEchoDistribution(
+                batch_folder_path_radar,
+                radar_subpath,
+                batch_folder_path_l3, l3_files_dic,
+                max_range,
+                clf_file)
+
+            bird_count_scan.append(n_birds)
+            insect_count_scan.append(n_insects)
+            weather_count_scan.append(n_weather)
+
+            # Analyze wind
+            time_hour = GetTimeHourUTC(radar_subpath)
+            is_near_sounding = (time_hour > time_window['noon'][0] and time_hour < time_window['noon'][1]) or (
+                    time_hour > time_window['midnight'][0] or time_hour < time_window['midnight'][1])
+
+            if is_near_sounding:
+                target_folder = os.path.split(radar_subpath)
+                target_file = target_folder[1]
+                target_folder = os.path.join(radar_folder, batch_folder, target_folder[0])
+                wind_figure_dir = os.path.join(figure_dir, batch_folder, curr_day, 'radar_sounding_wind')
+
+                print('Analyzing wind for ', target_file, ' ....')
+
+                vad_profiles, sounding_df = AnalyzeWind(target_file, target_folder, batch_folder_path_l3,
+                                                        radar_t_sounding,
+                                                        station_infos, sounding_log_dir,
+                                                        norm_stats_file, clf_file, vad_jobs, figure_dir=wind_figure_dir,
+                                                        match_radar_and_sounding_grid=True,
+                                                        save_wind_figure=True, radar=radar_obj, hca_vol=hca_vol,
+                                                        data_table=data_table, l3_filelist=None)
 
         echo_count_scan = {VADMask.birds: bird_count_scan, VADMask.insects: insect_count_scan,
                            VADMask.weather: weather_count_scan}
