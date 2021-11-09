@@ -15,7 +15,7 @@ plt.rc('font', **font)
 # Might need to tune for best availability threshold.
 
 def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_jobs, title_str, prop_str,
-                   output_folder, save_plots):
+                   output_folder, figure_prefix, save_plots):
     if not os.path.isdir(output_folder):
         os.makedirs(output_folder)
 
@@ -59,7 +59,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     ax[1].legend()
     fig.suptitle(title_str)
     if save_plots:
-        plt.savefig(os.path.join(output_folder, "wind_comparison_spherical.png"))
+        plt.savefig(os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_spherical.png"])))
 
     # Plot for U and V wind components.
     plt.figure()
@@ -102,7 +102,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     plt.legend(ncol=3)
     plt.tight_layout()
     if save_plots:
-        plt.savefig(os.path.join(output_folder, "wind_comparison_components.png"))
+        plt.savefig(os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_components.png"])))
     plt.show()
 
     return
@@ -245,8 +245,7 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
 
 def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
                 norm_stats_file, clf_file, vad_jobs, figure_dir, match_radar_and_sounding_grid=True,
-                save_wind_figure=False, radar = None, hca_vol = None, data_table = None, l3_filelist = None):
-
+                save_wind_figure=False, radar=None, hca_vol=None, data_table=None, l3_filelist=None):
     radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
 
     # HCA.
@@ -378,14 +377,15 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
 
     description_jobs = {VADMask.biological: ("bio", "."), VADMask.insects: ("ins", "2"),
                         VADMask.weather: ("wea", "d"), VADMask.birds: ("bir", "^")}
+    figure_prefix = os.path.splitext(radar_data_file)[0]
 
     if match_radar_and_sounding_grid:
         VisualizeWinds(vad_profiles_job_interp, sounding_wind_df_interp, 1100, description_jobs, title_str, prop_str,
-                       figure_dir, save_wind_figure)
+                       figure_dir, figure_prefix, save_wind_figure)
         return vad_profiles_job_interp, sounding_wind_df_interp
 
     VisualizeWinds(vad_profiles_job, sounding_wind_df, 1100, description_jobs, title_str, prop_str,
-                   figure_dir, save_wind_figure)
+                   figure_dir, figure_prefix, save_wind_figure)
     return vad_profiles_job, sounding_wind_df
 
 
