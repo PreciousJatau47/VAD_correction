@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import pyart
 import matplotlib.pyplot as plt
+from matplotlib import colors
+from PreciousFunctions import PreciousCmap
 
 font = {'family': 'DejaVu Sans',
         'weight': 'bold',
@@ -133,7 +135,7 @@ def GetDataTableColorMapInfo():
             'hca': ('viridis', [0, 150], 16),
             'hca_bio': ('viridis', [0, 1], 2),
             'hca_weather': ('Spectral', [0, 1], 2),
-            'BIClass': ('viridis', [-1, 1], 3)}
+            'BIClass': ('custom', [0, 1], 3)}
 
 
 def GetDataTableColorMap():
@@ -146,14 +148,14 @@ def GetDataTableColorMap():
         if key in pyart_products:
             cmap[key] = (pyart.graph.cm._generate_cmap(cmap_info[key][0], cmap_info[key][2]), cmap_info[key][1])
         elif key == 'BIClass':
-            # TODO replace with custom color map
-            cmap[key] = (plt.cm.get_cmap(cmap_info[key][0], cmap_info[key][2]), cmap_info[key][1])
+            _, pCmap = PreciousCmap(256)
+            cmap[key] = (colors.ListedColormap([pCmap[0], pCmap[-1]]), cmap_info[key][1])
         else:
             cmap[key] = (plt.cm.get_cmap(cmap_info[key][0], cmap_info[key][2]), cmap_info[key][1])
     return cmap
 
 
-def VisualizeDataTable(data_table, color_map, output_folder):
+def VisualizeDataTable(data_table, color_map, output_folder, scan_name=None, title_suffix=None, combine_plots=True):
     if not os.path.isdir(output_folder):
         os.makedirs(output_folder)
 
@@ -169,42 +171,63 @@ def VisualizeDataTable(data_table, color_map, output_folder):
     range_grid = np.array(data_table["range"][data_table["elevation"] == 0.5])
     range_grid = range_grid.reshape(num_az, num_range)
 
+    radar_name, year, month, day, hh, mm, ss = read_info_from_radar_name(scan_name)
+    title_str = '{}, {}/{}/{}, {}:{}:{} UTC.'.format(radar_name, year, month, day, hh, mm, ss)
+    title_bi = ''.join([title_str, '\n', title_suffix])
+
     products = list(color_map.keys())
     for product in products:
-        output_path = output_folder + "\\" + product + ".png"
 
-        # Select color map.
-        # TODO move building color map to GetDataTableColorMap
-        if product == "hca" or product == "hca_bio" or product == "hca_weather" or product == "BIClass":
-            cmap = plt.cm.get_cmap(color_map[product][0], color_map[product][2])
+        product_folder = os.path.join(output_folder, product)
+        if not os.path.isdir(product_folder):
+            os.makedirs(product_folder)
+
+        if scan_name:
+            output_path = os.path.join(product_folder, ''.join([scan_name, '_', '.png']))
         else:
-            cmap = pyart.graph.cm._generate_cmap(color_map[product][0], color_map[product][2])
+            output_path = product_folder + "\\" + product + ".png"
 
-        fig, ax = plt.subplots(2, 2, sharex=True, sharey=True)
-        count_subplot = 0
+        if combine_plots:
+            fig, ax = plt.subplots(2, 2, sharex=True, sharey=True)
+            count_subplot = 0
+        else:
+            # TODO handle individual plots.
+            sys.exit("VisualizeDataTable: No definition for individual plots.")
+
         for curr_el in elevation_slices:
             x = np.multiply(range_grid * np.cos(curr_el * np.pi / 180), np.sin(az_grid * np.pi / 180))
             y = np.multiply(range_grid * np.cos(curr_el * np.pi / 180), np.cos(az_grid * np.pi / 180))
-            data_grid = np.array(data_table[product][data_table["elevation"] == curr_el])
-            data_grid = data_grid.reshape(num_az, num_range)
+            elev_mask = data_table["elevation"] == curr_el
+            data_mask = data_table["mask_velocity"][elev_mask]  # TODO dp
 
-            im = ax[count_subplot // 2, count_subplot % 2].pcolor(x, y, data_grid, cmap=cmap,
-                                                                  vmin=color_map[product][1][0],
-                                                                  vmax=color_map[product][1][1])
-            ax[count_subplot // 2, count_subplot % 2].set_title(str(curr_el) + "$^{\circ}$.")
-            count_subplot += 1
-        fig.add_subplot(111, frameon=False)
-        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
-        plt.xlabel('X [km]')
-        plt.ylabel('Y [km]')
-        fig.suptitle(product)
-        plt.tight_layout()
-        fig.subplots_adjust(right=0.8)
-        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-        fig.colorbar(im, cax=cbar_ax)
-        # plt.show()
+            data_grid = data_table[product][elev_mask]
+            data_grid[np.logical_not(data_mask)] = np.nan
+            data_grid = np.array(data_grid).reshape(num_az, num_range)
+
+            if combine_plots:
+                im = ax[count_subplot // 2, count_subplot % 2].pcolor(x, y, data_grid, cmap=color_map[product][0],
+                                                                      vmin=color_map[product][1][0],
+                                                                      vmax=color_map[product][1][1])
+                ax[count_subplot // 2, count_subplot % 2].set_title(str(curr_el) + "$^{\circ}$.")
+                count_subplot += 1
+
+        if combine_plots:
+            fig.add_subplot(111, frameon=False)
+            plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+            plt.xlabel('X [km]')
+            plt.ylabel('Y [km]')
+            if product == "BIClass":
+                fig.suptitle(title_bi)
+            else:
+                fig.suptitle(title_str)
+            plt.tight_layout()
+            fig.subplots_adjust(right=0.8)
+            fig.subplots_adjust(top=0.84)
+            cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+            fig.colorbar(im, cax=cbar_ax)
+            # plt.show()
         plt.savefig(output_path, dpi=200)
-        # plt.close(fig)
+        plt.close(fig)
     return
 
 
