@@ -308,8 +308,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
 
     # Visualize data table.
     color_map = GetDataTableColorMap()
-    color_map = {'BIClass': ('viridis', [-1, 1], 3)}
-    # VisualizeDataTable(data_table, color_map, figure_folder)
+    # VisualizeDataTable(data_table, color_map, figure_dir, scan_name = radar_data_file, title_suffix = "", combine_plots=True)
 
     # VAD wind profile
     signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])
@@ -365,7 +364,6 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     prop_insects = round(prop_insects * 100)
     prop_weather = np.sum(data_table['hca_weather'][height_msk] == 1) / total_echoes
     prop_weather = round(prop_weather * 100)
-
     prop_str = "{}% birds, {}% insects, {}% weather".format(prop_birds, prop_insects, prop_weather)
 
     title_str = "{}, {}/{}/{}, {}:{}:{} UTC.\n{} km from {} UTC {} sounding.".format(
