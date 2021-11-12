@@ -13,7 +13,6 @@ plt.rc('font', **font)
 # TODO
 # need check for if sounding is available.
 # Might need to tune for best availability threshold.
-
 def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_jobs, title_str, prop_str,
                    output_folder, figure_prefix, save_plots):
     if not os.path.isdir(output_folder):
@@ -39,13 +38,16 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
 
     # Sounding speed and direction.
     sounding_height_idx = sounding_wind_df['HGHT'] < max_height
-    ax[0].scatter(sounding_wind_df["DRCT"][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
-                  marker='o', color="blue", alpha=0.5)
-    ax[0].plot(sounding_wind_df["DRCT"][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
+    sounding_plot_idx = np.isfinite(sounding_wind_df["DRCT"])
+    sounding_plot_idx = np.logical_and(sounding_plot_idx, sounding_height_idx)
+
+    ax[0].scatter(sounding_wind_df["DRCT"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
+                  marker='o', color="blue", alpha=0.1)
+    ax[0].plot(sounding_wind_df["DRCT"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
                label="sound dir", color="blue", linestyle='dashed')
-    ax[1].scatter(sounding_wind_df["SMPS"][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
-                  color="red", marker='o', alpha=0.5)
-    ax[1].plot(sounding_wind_df["SMPS"][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
+    ax[1].scatter(sounding_wind_df["SMPS"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
+                  color="red", marker='o', alpha=0.1)
+    ax[1].plot(sounding_wind_df["SMPS"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
                label="Sound spd", color="red", linestyle='dashed')
 
     ax[0].set_xlim(0, 360)
@@ -85,9 +87,9 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     # Sounding wind components.
     sounding_height_idx = sounding_wind_df['HGHT'] < max_height
     plt.scatter(sounding_wind_df['windU'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
-                marker='o', color="blue", alpha=0.5)
+                marker='o', color="blue", alpha=0.1)
     plt.scatter(sounding_wind_df['windV'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
-                color="red", alpha=0.5)
+                color="red", alpha=0.1)
     plt.plot(sounding_wind_df['windU'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
              label="wind_U", color="blue", linestyle='dashed')
     plt.plot(sounding_wind_df['windV'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
@@ -103,7 +105,8 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     plt.tight_layout()
     if save_plots:
         plt.savefig(os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_components.png"])))
-    plt.show()
+    # plt.show()
+    plt.close()
 
     return
 
