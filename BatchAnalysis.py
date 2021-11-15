@@ -100,8 +100,8 @@ def GetTimeHourUTC(some_str: str) -> float:
 
 
 def AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
-                     time_window, clf_file, radar_t_sounding, station_infos, sounding_log_dir, norm_stats_file,
-                     vad_jobs, figure_dir, vad_sounding_dir):
+                     max_height_VAD, time_window, clf_file, radar_t_sounding, station_infos, sounding_log_dir,
+                     norm_stats_file, vad_jobs, figure_dir, vad_sounding_dir):
     vad_sounding_dir = os.path.join(vad_sounding_dir, batch_folder)
     if not os.path.isdir(vad_sounding_dir):
         os.makedirs(vad_sounding_dir)
@@ -146,10 +146,12 @@ def AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_
                                                             radar_t_sounding,
                                                             station_infos, sounding_log_dir,
                                                             norm_stats_file, clf_file, vad_jobs,
-                                                            figure_dir=wind_figure_dir,
+                                                            figure_dir=wind_figure_dir, max_range=max_range,
+                                                            max_height_VAD=max_height_VAD,
                                                             match_radar_and_sounding_grid=True,
                                                             save_wind_figure=True, radar=radar_obj, hca_vol=hca_vol,
                                                             data_table=data_table, l3_filelist=None)
+
                     with open(vad_sounding_path, 'wb') as p_out:
                         pickle.dump({'VAD': vad_profiles, 'Sounding': sounding_df}, p_out)
                     p_out.close()
@@ -240,14 +242,14 @@ def Main():
     force_output_logging = False
     output_log_dir = "./analysis_output_logs"
     figure_dir = './figures'
-    save_ppi_plots = False
-    analyze_wind = True
+    save_ppi_plots = True
 
-    batch_folder = "KOHX_20180516_20180531"
+    batch_folder = "KOHX_20180501_20180515"
     date_pattern = "*KOHX201805{}*_V06.*"
-    start_day = 16
-    stop_day = 31
-    max_range = 400  # in km
+    start_day = 11
+    stop_day = 11
+    max_range = 400  # in km.
+    max_height_VAD = 1000  # in m.
 
     # Model.
     norm_stats_file = "./models/ridge_bi/mean_std_for_normalization_1.pkl"
@@ -263,12 +265,12 @@ def Main():
                    'midnight': (24 - delta_time_hr, (24 + delta_time_hr) % 24)}
     vad_sounding_output_dir = "./vad_sounding_comparison_logs"
 
-    GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
-                             clf_file, output_log_dir, figure_dir, save_ppi_plots, force_output_logging)
+    # GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
+    #                          clf_file, output_log_dir, figure_dir, save_ppi_plots, force_output_logging)
 
-    # AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
-    #                  time_window, clf_file, radar_t_sounding, station_infos, sounding_log_dir, norm_stats_file,
-    #                  vad_jobs, figure_dir, vad_sounding_output_dir)
+    AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
+                     max_height_VAD, time_window, clf_file, radar_t_sounding, station_infos, sounding_log_dir,
+                     norm_stats_file, vad_jobs, figure_dir, vad_sounding_output_dir)
 
 
 Main()
