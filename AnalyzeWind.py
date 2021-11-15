@@ -253,13 +253,8 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
 def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
                 norm_stats_file, clf_file, vad_jobs, figure_dir, match_radar_and_sounding_grid=True,
                 save_wind_figure=False, radar=None, hca_vol=None, data_table=None, l3_filelist=None):
-    radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
 
-    # HCA.
-    if l3_filelist is None:
-        radar_base = radar_data_file[:12]
-        radar_data_folder = os.path.join(radar_data_folder, radar_base)
-        hca_data_folder = os.path.join(hca_data_folder, radar_base)
+    radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
 
     # Sounding.
     radar_name, year, month, day, hh, mm, ss = read_info_from_radar_name(radar_data_file)
@@ -270,17 +265,6 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     if not os.path.isdir(sounding_log_dir):
         os.makedirs(sounding_log_dir)
 
-    # Classification models.
-    bi_norm_stats_file = norm_stats_file
-    bi_clf_file = clf_file
-
-    # Read HCA data.
-    if hca_vol is None:
-        if l3_filelist is None:
-            hca_vol = GetHcaVol(hca_data_folder, radar_data_file_no_ext)
-        else:
-            hca_vol = GetHcaVolFromFileList(hca_data_folder, radar_data_file_no_ext, l3_filelist)
-
     # Read radar data.
     if radar is None:
         radar = pyart.io.read(os.path.join(radar_data_folder, radar_data_file))
@@ -289,6 +273,35 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                       "longitude": radar.longitude['data'][0],
                       "height": radar.altitude['data'][0]}
 
+    # Sounding wind profile.
+    year_sounding, month_sounding, ddhh_sounding = GetSoundingDateTimeFromRadarFile(radar_data_file)
+    sounding_wind_df, sounding_location, sounding_url = GetSoundingWind(sounding_url_base, radar_data_file,
+                                                                        location_radar,
+                                                                        station_id, sounding_log_dir,
+                                                                        showDebugPlot=False, log_sounding_data=True,
+                                                                     force_website_download=False)
+    if sounding_wind_df is None:
+        print("Sounding data is not available for this scan. Aborting wind analysis ...")
+        return None, None
+
+    distance_radar_sounding = GetHaverSineDistance(location_radar["latitude"], location_radar["longitude"],
+                                                   sounding_location["latitude"],
+                                                   sounding_location["longitude"])
+    distance_radar_sounding = round(distance_radar_sounding / 1000, 2)
+
+    # Read HCA data.
+    if l3_filelist is None:
+        radar_base = radar_data_file[:12]
+        radar_data_folder = os.path.join(radar_data_folder, radar_base)
+        hca_data_folder = os.path.join(hca_data_folder, radar_base)
+
+    if hca_vol is None:
+        if l3_filelist is None:
+            hca_vol = GetHcaVol(hca_data_folder, radar_data_file_no_ext)
+        else:
+            hca_vol = GetHcaVolFromFileList(hca_data_folder, radar_data_file_no_ext, l3_filelist)
+
+    # Data table.
     if data_table is None:
         data_table = MergeRadarAndHCAUpdate(radar, hca_vol, 300)
 
@@ -311,7 +324,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     X.rename(columns={"differential_phase": "pdp"}, inplace=True)
     X.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
     data_table['BIClass'] = -1
-    data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, bi_clf_file)
+    data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file)
 
     # Visualize data table.
     color_map = GetDataTableColorMap()
@@ -327,18 +340,6 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     for vad_mask in vad_jobs:
         wind_profile_vad = VADWindProfile(signal_func, vad_heights, vad_mask, data_table, showDebugPlot=False)
         vad_profiles_job[vad_mask] = wind_profile_vad
-
-    # Sounding wind profile.
-    year_sounding, month_sounding, ddhh_sounding = GetSoundingDateTimeFromRadarFile(radar_data_file)
-    sounding_wind_df, sounding_location, sounding_url = GetSoundingWind(sounding_url_base, radar_data_file,
-                                                                        location_radar,
-                                                                        station_id, sounding_log_dir,
-                                                                        showDebugPlot=False, log_sounding_data=True,
-                                                                        force_website_download=False)
-    distance_radar_sounding = GetHaverSineDistance(location_radar["latitude"], location_radar["longitude"],
-                                                   sounding_location["latitude"],
-                                                   sounding_location["longitude"])
-    distance_radar_sounding = round(distance_radar_sounding / 1000, 2)
 
     # Interpolate wind components.
     max_height = 1100  # meters.
