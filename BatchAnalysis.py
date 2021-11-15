@@ -56,7 +56,8 @@ def GetFileListRadar(batch_folder_path, start_day, stop_day, date_pattern):
     return filelist_dic
 
 
-def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l3, l3_files_dic, max_range, clf_file):
+def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l3, l3_files_dic, max_range,
+                     height_binsize=0.04, clf_file=None):
     # Read radar volume.
     try:
         print("Opening ", os.path.join(batch_folder_path_radar, radar_subpath))
@@ -77,6 +78,11 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
     data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
     data_table["hca_bio"] = data_table["hca"] == 10.0
     data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
+    data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
+
+    data_table["height_bin_meters"] = (np.floor(
+        data_table["height"] / height_binsize) + 1) * height_binsize - height_binsize / 2
+    data_table["height_bin_meters"] *= 1000
 
     echo_mask = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
     X = data_table.loc[
@@ -129,8 +135,8 @@ def AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_
                 data_table, radar_obj, hca_vol = PrepareDataTable(batch_folder_path_radar,
                                                                   radar_subpath,
                                                                   batch_folder_path_l3, l3_files_dic,
-                                                                  max_range,
-                                                                  clf_file)
+                                                                  max_range=max_range,
+                                                                  clf_file=clf_file)
 
                 if radar_obj is not None:
                     target_folder = os.path.split(radar_subpath)
@@ -192,7 +198,8 @@ def GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_da
 
             # Load data. Takes ~7s.
             data_table, radar_obj, hca_vol = PrepareDataTable(batch_folder_path_radar, radar_subpath,
-                                                              batch_folder_path_l3, l3_files_dic, max_range, clf_file)
+                                                              batch_folder_path_l3, l3_files_dic, max_range=max_range,
+                                                              clf_file=clf_file)
 
             # Echo distribution.
             if data_table is None:
