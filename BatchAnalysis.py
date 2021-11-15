@@ -148,18 +148,19 @@ def AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_
 
                     # Takes ~16s.
                     print('Analyzing wind for ', target_file, ' ....')
-                    vad_profiles, sounding_df = AnalyzeWind(target_file, target_folder, batch_folder_path_l3,
-                                                            radar_t_sounding,
-                                                            station_infos, sounding_log_dir,
-                                                            norm_stats_file, clf_file, vad_jobs,
-                                                            figure_dir=wind_figure_dir, max_range=max_range,
-                                                            max_height_VAD=max_height_VAD,
-                                                            match_radar_and_sounding_grid=True,
-                                                            save_wind_figure=True, radar=radar_obj, hca_vol=hca_vol,
-                                                            data_table=data_table, l3_filelist=None)
+                    vad_profiles, sounding_df, echo_dist = AnalyzeWind(target_file, target_folder, batch_folder_path_l3,
+                                                                       radar_t_sounding, station_infos,
+                                                                       sounding_log_dir, norm_stats_file, clf_file,
+                                                                       vad_jobs, figure_dir=wind_figure_dir,
+                                                                       max_range=max_range,
+                                                                       max_height_VAD=max_height_VAD,
+                                                                       match_radar_and_sounding_grid=True,
+                                                                       save_wind_figure=True, radar=radar_obj,
+                                                                       hca_vol=hca_vol,
+                                                                       data_table=data_table, l3_filelist=None)
 
                     with open(vad_sounding_path, 'wb') as p_out:
-                        pickle.dump({'VAD': vad_profiles, 'Sounding': sounding_df}, p_out)
+                        pickle.dump({'VAD': vad_profiles, 'Sounding': sounding_df, 'echo_dist': echo_dist}, p_out)
                     p_out.close()
     return
 
@@ -251,10 +252,10 @@ def Main():
     figure_dir = './figures'
     save_ppi_plots = True
 
-    batch_folder = "KOHX_20180501_20180515"
+    batch_folder = "KOHX_20180516_20180531"
     date_pattern = "*KOHX201805{}*_V06.*"
-    start_day = 11
-    stop_day = 11
+    start_day = 16
+    stop_day = 31
     max_range = 400  # in km.
     max_height_VAD = 1000  # in m.
 
