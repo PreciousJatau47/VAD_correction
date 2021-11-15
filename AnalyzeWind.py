@@ -372,6 +372,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     prop_weather = np.sum(data_table['hca_weather'][height_msk] == 1) / total_echoes
     prop_weather = round(prop_weather * 100)
     prop_str = "{}% birds, {}% insects, {}% weather".format(prop_birds, prop_insects, prop_weather)
+    echo_dist_VAD = {'bird': prop_birds, 'insects': prop_insects, 'weather': prop_weather}
 
     title_str = "{}, {}/{}/{}, {}:{}:{} UTC.\n{} km from {} UTC {} sounding.".format(
         radar_name, year, month,
@@ -387,11 +388,11 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     if match_radar_and_sounding_grid:
         VisualizeWinds(vad_profiles_job_interp, sounding_wind_df_interp, 1100, description_jobs, title_str, prop_str,
                        figure_dir, figure_prefix, save_wind_figure)
-        return vad_profiles_job_interp, sounding_wind_df_interp
+        return vad_profiles_job_interp, sounding_wind_df_interp, echo_dist_VAD
 
     VisualizeWinds(vad_profiles_job, sounding_wind_df, 1100, description_jobs, title_str, prop_str,
                    figure_dir, figure_prefix, save_wind_figure)
-    return vad_profiles_job, sounding_wind_df
+    return vad_profiles_job, sounding_wind_df, echo_dist_VAD
 
 
 def Main():
@@ -413,10 +414,10 @@ def Main():
 
     figure_dir = os.path.join('./figures', radar_data_file[:12])
 
-    vad_profiles, sounding_df = AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding,
-                                            station_infos, sounding_log_dir,
-                                            norm_stats_file, clf_file, vad_jobs, figure_dir=figure_dir,
-                                            match_radar_and_sounding_grid=True,
-                                            save_wind_figure=False)
+    vad_profiles, sounding_df, echo_dist = AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder,
+                                                       radar_t_sounding, station_infos, sounding_log_dir,
+                                                       norm_stats_file, clf_file, vad_jobs, figure_dir=figure_dir,
+                                                       match_radar_and_sounding_grid=True,
+                                                       save_wind_figure=False)
 
 # Main()
