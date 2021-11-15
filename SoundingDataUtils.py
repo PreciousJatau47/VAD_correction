@@ -45,6 +45,9 @@ def GetSoundingData(url):
     soup = BeautifulSoup(html, features="lxml")
     pre = soup.find_all('pre')
 
+    if not pre:
+        return None, None, None
+
     # Load sounding data.
     sounding_data = str(pre[0])
     sounding_data_lines = sounding_data.splitlines()
@@ -99,6 +102,9 @@ def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_
         return sounding_data_logged
 
     sounding_data_df, header_units, meta_data = GetSoundingData(sounding_url)
+
+    if sounding_data_df is None:
+        return None, None, sounding_url
 
     # Location of sounding station in degrees and meters.
     location_sounding = {"latitude": float(meta_data['Station latitude']),
