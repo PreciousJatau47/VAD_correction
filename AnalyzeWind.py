@@ -251,9 +251,9 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
 
 
 def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
-                norm_stats_file, clf_file, vad_jobs, figure_dir, match_radar_and_sounding_grid=True,
-                save_wind_figure=False, radar=None, hca_vol=None, data_table=None, l3_filelist=None):
-
+                norm_stats_file, clf_file, vad_jobs, figure_dir, max_range=300, max_height_VAD=1000,
+                match_radar_and_sounding_grid=True, save_wind_figure=False, radar=None, hca_vol=None, data_table=None,
+                l3_filelist=None):
     radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
 
     # Sounding.
@@ -279,7 +279,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                                                                         location_radar,
                                                                         station_id, sounding_log_dir,
                                                                         showDebugPlot=False, log_sounding_data=True,
-                                                                     force_website_download=False)
+                                                                        force_website_download=False)
     if sounding_wind_df is None:
         print("Sounding data is not available for this scan. Aborting wind analysis ...")
         return None, None
@@ -303,7 +303,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
 
     # Data table.
     if data_table is None:
-        data_table = MergeRadarAndHCAUpdate(radar, hca_vol, 300)
+        data_table = MergeRadarAndHCAUpdate(radar, hca_vol, max_range)
 
     # TODO Precious. Get original ZDR mask.
     data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
@@ -332,7 +332,6 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
 
     # VAD wind profile
     signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])
-    max_height_VAD = 1000
     vad_heights = np.arange(80, max_height_VAD, 40)
     # vad_heights = np.array([480])
 
@@ -342,7 +341,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
         vad_profiles_job[vad_mask] = wind_profile_vad
 
     # Interpolate wind components.
-    max_height = 1100  # meters.
+    max_height = 1.1 * max_height_VAD  # meters.
     max_height_diff = 250  # meters.
     height_grid_interp = wind_profile_vad['height']
     height_grid_interp = height_grid_interp[height_grid_interp < max_height]
