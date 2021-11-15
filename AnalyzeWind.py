@@ -29,12 +29,14 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
         wind_profile_vad = vad_profiles_job[job_id]
         vad_height_idx = wind_profile_vad['height'] < max_height
 
+        ax[0].scatter(wind_profile_vad["wind_direction"][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
+                      color=blue_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.35)
         ax[0].plot(wind_profile_vad["wind_direction"][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
-                   color=blue_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
-                   label=description_jobs[job_id][0] + " dir")
+                   color=blue_color_wheel[job_id], label=description_jobs[job_id][0] + " dir")
+        ax[1].scatter(wind_profile_vad["wind_speed"][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
+                      color=red_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.35)
         ax[1].plot(wind_profile_vad["wind_speed"][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
-                   color=red_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
-                   label=description_jobs[job_id][0] + " spd")
+                   color=red_color_wheel[job_id], label=description_jobs[job_id][0] + " spd")
 
     # Sounding speed and direction.
     sounding_height_idx = sounding_wind_df['HGHT'] < max_height
@@ -42,13 +44,13 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     sounding_plot_idx = np.logical_and(sounding_plot_idx, sounding_height_idx)
 
     ax[0].scatter(sounding_wind_df["DRCT"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
-                  marker='o', color="blue", alpha=0.1)
+                  marker='o', color="blue", alpha=0.4)
     ax[0].plot(sounding_wind_df["DRCT"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
-               label="sound dir", color="blue", linestyle='dashed')
+               label="sound dir", color="blue", linestyle='dashed', alpha=0.8)
     ax[1].scatter(sounding_wind_df["SMPS"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
-                  color="red", marker='o', alpha=0.1)
+                  color="red", marker='o', alpha=0.4)
     ax[1].plot(sounding_wind_df["SMPS"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
-               label="Sound spd", color="red", linestyle='dashed')
+               label="Sound spd", color="red", linestyle='dashed', alpha=0.8)
 
     ax[0].set_xlim(0, 360)
     ax[0].set_ylim(0, 1.4 * max_height)
@@ -77,12 +79,14 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
         vad_height_idx = wind_profile_vad['height'] < max_height
 
         # Radar wind components.
+        plt.scatter(wind_profile_vad['wind_U'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
+                    color=blue_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.35)
         plt.plot(wind_profile_vad['wind_U'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
-                 color=blue_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
-                 label=description_jobs[job_id][0] + " vad_U")
+                 color=blue_color_wheel[job_id], alpha=0.8, label=description_jobs[job_id][0] + " vad_U")
+        plt.scatter(wind_profile_vad['wind_V'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
+                    color=red_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.35)
         plt.plot(wind_profile_vad['wind_V'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
-                 color=red_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.5,
-                 label=description_jobs[job_id][0] + " vad_V")
+                 color=red_color_wheel[job_id], alpha=0.8, label=description_jobs[job_id][0] + " vad_V")
 
     # Sounding wind components.
     sounding_height_idx = sounding_wind_df['HGHT'] < max_height
