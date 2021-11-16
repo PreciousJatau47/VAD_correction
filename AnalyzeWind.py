@@ -197,7 +197,9 @@ def InterpolateSoundingWind(sounding_df, height_grid_interp, max_height_diff, ma
     height_grid = height_grid[idx_height]
     windU = windU[idx_height]
     windV = windV[idx_height]
+    idx_height = idx_height[idx_height]
 
+    idx_height = idx_height.append(pd.Series([False for i in range(len(height_grid_interp))]), ignore_index=True)
     height_grid_interp = height_grid.append(height_grid_interp, ignore_index=True)
     windU_interp = windU.append(pd.Series(windU_interp), ignore_index=True)
     windV_interp = windV.append(pd.Series(windV_interp), ignore_index=True)
@@ -205,6 +207,8 @@ def InterpolateSoundingWind(sounding_df, height_grid_interp, max_height_diff, ma
         {'HGHT': height_grid_interp, 'windU': windU_interp, 'windV': windV_interp})
 
     df_interp['TEMP'] = np.nan
+    print(df_interp.shape)
+    print(idx_height.shape)
     df_interp['TEMP'][idx_height] = sounding_df['TEMP'][idx_height]
     df_interp['DRCT'] = np.nan
     df_interp['DRCT'][idx_height] = sounding_df['DRCT'][idx_height]
