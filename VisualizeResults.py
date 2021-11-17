@@ -171,6 +171,7 @@ def AccumulateResults(start_day, stop_day, file_base, log_dir, normalize_counts)
 
 
 def Main():
+    batch_folder = 'KOHX_20180501_20180515'
     log_dir = './analysis_output_logs'
     radar_name = 'KOHX'
     file_base = 'KOHX{}{}{}_echo_count.pkl'
@@ -179,8 +180,11 @@ def Main():
     start_day = 1
     stop_day = 15
     normalize_counts = True
-    save_fig = True
-    output_figure_dir = './figures/KOHX_20180501_20180515'
+    save_fig = False
+    output_figure_dir = './figures'
+
+    log_dir = os.path.join(log_dir, batch_folder)
+    output_figure_dir = os.path.join(output_figure_dir, batch_folder, 'summary')
 
     month_num_t_name = GetMonthNumberToName()
 
@@ -192,8 +196,8 @@ def Main():
     if not os.path.isdir(output_figure_dir):
         os.makedirs(output_figure_dir)
 
-    # VisualizeEchoDistributionForMultipleDays(start_day, stop_day, file_base, log_dir, normalize_counts, save_fig,
-    #                                          output_figure_dir)
+    VisualizeEchoDistributionForMultipleDays(start_day, stop_day, file_base, log_dir, normalize_counts, save_fig,
+                                             output_figure_dir)
 
     echo_counts_batch, day_grid, time_hour_grid = AccumulateResults(start_day, stop_day, file_base, log_dir,
                                                                     normalize_counts)

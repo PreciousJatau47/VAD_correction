@@ -252,10 +252,10 @@ def Main():
     figure_dir = './figures'
     save_ppi_plots = True
 
-    batch_folder = "KOHX_20180516_20180531"
+    batch_folder = "KOHX_20180501_20180515"
     date_pattern = "*KOHX201805{}*_V06.*"
-    start_day = 16
-    stop_day = 31
+    start_day = 1
+    stop_day = 15
     max_range = 400  # in km.
     max_height_VAD = 1000  # in m.
 
@@ -273,12 +273,12 @@ def Main():
                    'midnight': (24 - delta_time_hr, (24 + delta_time_hr) % 24)}
     vad_sounding_output_dir = "./vad_sounding_comparison_logs"
 
-    # GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
-    #                          clf_file, output_log_dir, figure_dir, save_ppi_plots, force_output_logging)
+    GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
+                             clf_file, output_log_dir, figure_dir, save_ppi_plots, force_output_logging)
 
-    AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
-                     max_height_VAD, time_window, clf_file, radar_t_sounding, station_infos, sounding_log_dir,
-                     norm_stats_file, vad_jobs, figure_dir, vad_sounding_output_dir)
+    # AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
+    #                  max_height_VAD, time_window, clf_file, radar_t_sounding, station_infos, sounding_log_dir,
+    #                  norm_stats_file, vad_jobs, figure_dir, vad_sounding_output_dir)
 
 
 Main()
