@@ -197,9 +197,9 @@ def InterpolateSoundingWind(sounding_df, height_grid_interp, max_height_diff, ma
     height_grid = height_grid[idx_height]
     windU = windU[idx_height]
     windV = windV[idx_height]
-    idx_height = idx_height[idx_height]
 
-    idx_height = idx_height.append(pd.Series([False for i in range(len(height_grid_interp))]), ignore_index=True)
+    idx_height_interp = idx_height[idx_height]
+    idx_height_interp = idx_height_interp.append(pd.Series([False for i in range(len(height_grid_interp))]), ignore_index=True)
     height_grid_interp = height_grid.append(height_grid_interp, ignore_index=True)
     windU_interp = windU.append(pd.Series(windU_interp), ignore_index=True)
     windV_interp = windV.append(pd.Series(windV_interp), ignore_index=True)
@@ -207,13 +207,11 @@ def InterpolateSoundingWind(sounding_df, height_grid_interp, max_height_diff, ma
         {'HGHT': height_grid_interp, 'windU': windU_interp, 'windV': windV_interp})
 
     df_interp['TEMP'] = np.nan
-    print(df_interp.shape)
-    print(idx_height.shape)
-    df_interp['TEMP'][idx_height] = sounding_df['TEMP'][idx_height]
+    df_interp['TEMP'][idx_height_interp] = sounding_df['TEMP'][idx_height]
     df_interp['DRCT'] = np.nan
-    df_interp['DRCT'][idx_height] = sounding_df['DRCT'][idx_height]
+    df_interp['DRCT'][idx_height_interp] = sounding_df['DRCT'][idx_height]
     df_interp['SMPS'] = np.nan
-    df_interp['SMPS'][idx_height] = sounding_df['SMPS'][idx_height]
+    df_interp['SMPS'][idx_height_interp] = sounding_df['SMPS'][idx_height]
     df_interp = df_interp.sort_values(by=['HGHT'])
 
     return df_interp
@@ -286,7 +284,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                                                                         force_website_download=False)
     if sounding_wind_df is None:
         print("Sounding data is not available for this scan. Aborting wind analysis ...")
-        return None, None
+        return None, None, None
 
     distance_radar_sounding = GetHaverSineDistance(location_radar["latitude"], location_radar["longitude"],
                                                    sounding_location["latitude"],
