@@ -72,14 +72,15 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot):
 
 
 def IsVADDistributionValid(az_cut, wind_dir, echo_type):
-    if echo_type != VADMask.insects:
+    if echo_type == VADMask.weather:
         return True
 
-    az_cut_bins = (az_cut - wind_dir) % 360 // 90
+    az_bin_size = 90
+    az_cut_bins = (az_cut - wind_dir) % 360 // az_bin_size
     az_bins_id = np.unique(az_cut_bins)
     az_bins_id = az_bins_id.astype('int32')
 
-    az_dist = np.zeros(az_bins_id.shape)
+    az_dist = np.zeros((360//az_bin_size,))
     for bin_idx in az_bins_id:
         az_dist[bin_idx] = np.sum(az_cut_bins == bin_idx)
     az_dist /= max(az_dist)
