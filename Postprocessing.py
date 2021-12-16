@@ -29,7 +29,9 @@ def WindError(x1, y1, x2, y2, error_fn, reduce_fn):
     reduced_error = reduce_fn(scores)
     return reduced_error, scores, x_scores
 
-def GetAirSpeedForScan(wind_file, wind_files_parent, error_fn, reduce_fn, debug_plots=False):
+
+def GetAirSpeedForScan(wind_file, wind_files_parent, error_fn, reduce_fn, debug_plots=False, figure_dir=None,
+                       save_plots=True):
     def GetAirSpeeds(delta_U, delta_V):
         airspeeds = []
         for i in range(len(delta_U)):
@@ -37,6 +39,11 @@ def GetAirSpeedForScan(wind_file, wind_files_parent, error_fn, reduce_fn, debug_
         return airspeeds
 
     wind_file_no_ext = os.path.splitext(wind_file)[0]
+
+    figure_dir = os.path.join(figure_dir, wind_file_no_ext[:12])
+    if not os.path.isdir(figure_dir):
+        os.makedirs(figure_dir)
+
     with open(os.path.join(wind_files_parent, wind_file), 'rb') as w_in:
         wind_result = pickle.load(w_in)
     w_in.close()
@@ -80,16 +87,20 @@ def GetAirSpeedForScan(wind_file, wind_files_parent, error_fn, reduce_fn, debug_
     if debug_plots:
         plt.figure()
         plt.scatter(airspeed_birds, x_sound_birds_U, color="blue", alpha=0.4)
-        plt.plot(airspeed_birds, x_sound_birds_U, color="blue")
+        plt.plot(airspeed_birds, x_sound_birds_U, color="blue", label="birds")
         plt.scatter(airspeed_insects, x_sound_insects_U, color="red", alpha=0.4)
-        plt.plot(airspeed_insects, x_sound_insects_U, color="red")
+        plt.plot(airspeed_insects, x_sound_insects_U, color="red", label="insects")
         plt.xlim(0, 12)
         plt.ylim(0, 900)
         plt.grid(True)
         plt.xlabel("flight speed [m/s]")
         plt.ylabel("height [m]")
         plt.title(wind_file_no_ext)
+        plt.legend()
+        if save_plots:
+            plt.savefig(os.path.join(figure_dir, "".join([wind_file_no_ext, '.png'])))
         plt.show()
+        plt.close()
 
     return pd.DataFrame({'file_name': wind_file_no_ext, 'airspeed_birds': airspeed_birds,
                          'airspeed_insects': airspeed_insects, 'height_m': x_sound_insects_U,
@@ -97,7 +108,8 @@ def GetAirSpeedForScan(wind_file, wind_files_parent, error_fn, reduce_fn, debug_
                          'prop_insects': echo_dist['insects'],
                          'prop_weather': echo_dist['weather']})
 
-def GetAirSpeedBatch(wind_files_parent, error_fn, reduce_fn):
+
+def GetAirSpeedBatch(wind_files_parent, error_fn, reduce_fn, figure_dir, debug_plots, save_plots):
     wind_files = os.listdir(wind_files_parent)
     wind_error_df = pd.DataFrame(
         columns=['file_name', 'airspeed_birds', 'airspeed_insects', 'height_m', 'prop_birds', 'prop_insects',
@@ -105,7 +117,9 @@ def GetAirSpeedBatch(wind_files_parent, error_fn, reduce_fn):
 
     # Get wind here.
     for wind_file in wind_files:
-        entry = GetAirSpeedForScan(wind_file, wind_files_parent, error_fn, reduce_fn)
+        entry = GetAirSpeedForScan(wind_file, wind_files_parent, error_fn, reduce_fn, debug_plots=debug_plots,
+                                   save_plots=save_plots,
+                                   figure_dir=figure_dir)
         if entry is not None:
             wind_error_df = wind_error_df.append(entry, ignore_index=True)
     return wind_error_df
@@ -121,6 +135,7 @@ def ImposeConstraints(df, constraints, idx=True):
         idx = np.logical_and(idx, np.logical_and(df[constraint[0]] > constraint[1], df[constraint[0]] < constraint[2]))
     return idx
 
+
 def FilterFlightspeeds(wind_error, constraints):
     target_idx = ImposeConstraints(wind_error, constraints)
     return wind_error[target_idx]
@@ -128,7 +143,6 @@ def FilterFlightspeeds(wind_error, constraints):
 
 def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plots, figure_summary_dir,
                           plot_title_suffix, out_name_suffix):
-
     idx_constraints = ImposeConstraints(wind_error, constraints)
 
     idx_valid = np.isfinite(wind_error['airspeed_birds'])
@@ -256,10 +270,10 @@ def Main():
     wind_dir = './vad_sounding_comparison_logs'
     batch_folders = ["KOHX_20180501_20180515_2hr_window", "KOHX_20180516_20180531_2hr_window"]
     experiment_id = "KOHX_20180501_20180531_2hr_window"
-    force_airspeed_analysis = False
+    force_airspeed_analysis = True
 
     save_plots = True
-    figure_dir = "./figures/airspeed_analysis/"
+    figure_dir = "./figures"
     plot_title_suffix = "May 1 - 31, 2018"
     out_name_suffix = "May_1_31_2018"
     figure_summary_dir = os.path.join(figure_dir, "summary", experiment_id)
@@ -280,11 +294,15 @@ def Main():
     log_output_path = os.path.join(log_dir, log_output_name)
     if force_airspeed_analysis or not os.path.isfile(log_output_path):
         if len(batch_folders) == 1:
-            wind_error = GetAirSpeedBatch(os.path.join(wind_dir, batch_folders[0]), error_fn, reduce_fn)
+            figure_dir_batch = os.path.join(figure_dir, batch_folders[0])
+            wind_error = GetAirSpeedBatch(os.path.join(wind_dir, batch_folders[0]), error_fn, reduce_fn,
+                                          figure_dir=figure_dir_batch, debug_plots=False)
         else:
             df_list = []
             for batch_folder in batch_folders:
-                df_list.append(GetAirSpeedBatch(os.path.join(wind_dir, batch_folder), error_fn, reduce_fn))
+                figure_dir_batch = os.path.join(figure_dir, batch_folder)
+                df_list.append(GetAirSpeedBatch(os.path.join(wind_dir, batch_folder), error_fn, reduce_fn,
+                                                figure_dir=figure_dir_batch, debug_plots=True, save_plots=True))
             wind_error = pd.concat(df_list, ignore_index=True)
             del df_list
 
@@ -317,14 +335,14 @@ def Main():
 
     # Visualize flight speeds
     c_group = "insect_prop"
-    out_name_suffix = "_".join(["color",c_group, out_name_suffix])
+    out_name_suffix = "_".join(["color", c_group, out_name_suffix])
     constraints = [("prop_weather", 0, MAX_WEATHER_PROP)]
     VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plots, figure_summary_dir,
                           plot_title_suffix, out_name_suffix)
 
     # Filter flight speeds.
     constraints = [("height_m", 350, 700), ("insect_prop_bio", 66.66, 100), ("airspeed_insects", 8, 10),
-                    ("airspeed_birds", 6, 12)]
+                   ("airspeed_birds", 6, 12)]
     wind_error_filt = FilterFlightspeeds(wind_error, constraints)
     print(np.unique(wind_error_filt.file_name))
 
