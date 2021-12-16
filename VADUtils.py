@@ -4,7 +4,7 @@ import math
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import least_squares, minimize
-from VADMaskEnum import VADMask
+from VADMaskEnum import *
 
 MIN_FRACTION_SAMPLES_REQUIRED = 1.5
 
@@ -26,7 +26,7 @@ def GetVADMask(data_table, echo_type):
     return vad_mask_arr
 
 
-def fitVAD(pred_var, resp_var, signal_func, showDebugPlot):
+def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description):
     """
     :param pred_var: Should have shape (N,).
     :param resp_var: Should have shape (N,).
@@ -67,6 +67,7 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot):
         ax[1].set_xlabel("Azimuth [$^{\circ}$]")
         ax[1].set_ylabel("Bin count")
 
+        plt.suptitle(description)
         plt.show()
     return wind_speed, wind_dir, optimized_signal
 
@@ -132,7 +133,9 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
         idx_ref = np.logical_and(idx_cut, radar_sp_table["reflectivity"] != -33.0)
         mean_ref = np.mean(radar_sp_table['reflectivity'][idx_ref])
 
-        wind_speed, wind_dir, fitted_points = fitVAD(az_cut, velocity_cut, signal_func, False)
+        description = "{}, {}m".format(GetVADMaskDescription(echo_type), height_vad)
+        wind_speed, wind_dir, fitted_points = fitVAD(az_cut, velocity_cut, signal_func, showDebugPlot, description)
+
         if math.isnan(wind_dir):
             vad_valid =  False
         else:
