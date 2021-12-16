@@ -109,7 +109,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     plt.tight_layout()
     if save_plots:
         plt.savefig(os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_components.png"])))
-    # plt.show()
+    plt.show()
     plt.close()
 
     return
@@ -199,7 +199,8 @@ def InterpolateSoundingWind(sounding_df, height_grid_interp, max_height_diff, ma
     windV = windV[idx_height]
 
     idx_height_interp = idx_height[idx_height]
-    idx_height_interp = idx_height_interp.append(pd.Series([False for i in range(len(height_grid_interp))]), ignore_index=True)
+    idx_height_interp = idx_height_interp.append(pd.Series([False for i in range(len(height_grid_interp))]),
+                                                 ignore_index=True)
     height_grid_interp = height_grid.append(height_grid_interp, ignore_index=True)
     windU_interp = windU.append(pd.Series(windU_interp), ignore_index=True)
     windV_interp = windV.append(pd.Series(windV_interp), ignore_index=True)
@@ -255,7 +256,7 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
 def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
                 norm_stats_file, clf_file, vad_jobs, figure_dir, max_range=300, max_height_VAD=1000,
                 match_radar_and_sounding_grid=True, save_wind_figure=False, radar=None, hca_vol=None, data_table=None,
-                l3_filelist=None):
+                l3_filelist=None, vad_debug_params=None):
     radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
 
     # Sounding.
@@ -334,12 +335,19 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
 
     # VAD wind profile
     signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])
-    vad_heights = np.arange(80, max_height_VAD, 40)
-    # vad_heights = np.array([480])
+
+    if vad_debug_params:
+        vad_heights = vad_debug_params['vad_heights']
+        show_vad_plot = vad_debug_params['show_plot']
+    else:
+        vad_heights = np.arange(80, max_height_VAD, 40)
+        # vad_heights = np.array([480])
+        show_vad_plot = False
 
     vad_profiles_job = {}
     for vad_mask in vad_jobs:
-        wind_profile_vad = VADWindProfile(signal_func, vad_heights, vad_mask, data_table, showDebugPlot=False)
+        wind_profile_vad = VADWindProfile(signal_func, vad_heights, vad_mask, data_table,
+                                          showDebugPlot = show_vad_plot)
         vad_profiles_job[vad_mask] = wind_profile_vad
 
     # Interpolate wind components.
@@ -395,5 +403,3 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     VisualizeWinds(vad_profiles_job, sounding_wind_df, 1100, description_jobs, title_str, prop_str,
                    figure_dir, figure_prefix, save_wind_figure)
     return vad_profiles_job, sounding_wind_df, echo_dist_VAD
-
-

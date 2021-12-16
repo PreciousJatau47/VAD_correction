@@ -2,6 +2,7 @@ import os
 from VADMaskEnum import VADMask
 from AnalyzeWind import *
 
+
 def Main():
     # Radar/Sounding.
     radar_data_file = "KOHX20150503_050828_V06.gz"  # "KOHX20180506_231319_V06"
@@ -18,6 +19,8 @@ def Main():
     # VAD options
     vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather]
     # vad_jobs = [VADMask.insects]
+    # vad_debug_params = {'show_plot': True, 'vad_heights': np.array([600])}
+    vad_debug_params = None
 
     figure_dir = os.path.join('./figures', radar_data_file[:12])
 
@@ -25,7 +28,7 @@ def Main():
                                                        radar_t_sounding, station_infos, sounding_log_dir,
                                                        norm_stats_file, clf_file, vad_jobs, figure_dir=figure_dir,
                                                        match_radar_and_sounding_grid=True,
-                                                       save_wind_figure=False)
+                                                       save_wind_figure=False, vad_debug_params=vad_debug_params)
 
 
 Main()
