@@ -250,6 +250,28 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         plt.savefig(os.path.join(figure_summary_dir, "".join(
             ["comparison_height_prop_", out_name_suffix, ".png"])), dpi=200)
 
+    # Plot 4. Histogram of data v insect proportion
+    fig, ax = plt.subplots(nrows=len(height_part), ncols=1, figsize = (6.4 * 1.05, 4.8 * 2))
+    for i_height_part in height_part.keys():
+        idx_height_part = np.logical_and(wind_error['height_m'] >= height_part[i_height_part][0],
+                                         wind_error['height_m'] < height_part[i_height_part][1])
+        idx_height_part = np.logical_and(idx_height_part, idx_valid)
+
+        ax[i_height_part].hist(wind_error["insect_prop_bio"][idx_height_part], bins=20)
+        ax[i_height_part].set_xlim(0, 100)
+        ax[i_height_part].set_title(
+            "Height, {} - {}m".format(height_part[i_height_part][0], height_part[i_height_part][1]))
+        ax[i_height_part].grid(True)
+
+    fig.add_subplot(111, frameon=False)
+    plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Insect proportion (relative to birds + insects)")
+    plt.ylabel("Frequency of flight speed samples")
+    plt.tight_layout()
+    if save_plots:
+        plt.savefig(os.path.join(figure_summary_dir, "".join(["histogram_samples_", out_name_suffix, ".png"])),
+                    dpi=200)
+
     # Plot 4. Histogram of bird, insect flightspeeds.
     plt.figure()
     plt.hist(x=wind_error["airspeed_insects"], color='red', alpha=0.5, label="insects")
@@ -270,13 +292,13 @@ def Main():
     wind_dir = './vad_sounding_comparison_logs'
     batch_folders = ["KOHX_20180501_20180515_2hr_window", "KOHX_20180516_20180531_2hr_window"]
     experiment_id = "KOHX_20180501_20180531_2hr_window"
-    force_airspeed_analysis = True
+    force_airspeed_analysis = False
 
     save_plots = True
     figure_dir = "./figures"
     plot_title_suffix = "May 1 - 31, 2018"
     out_name_suffix = "May_1_31_2018"
-    figure_summary_dir = os.path.join(figure_dir, "summary", experiment_id)
+    figure_summary_dir = os.path.join(figure_dir, experiment_id, 'summary')
     if not os.path.isdir(figure_summary_dir):
         os.makedirs(figure_summary_dir)
 
@@ -302,7 +324,7 @@ def Main():
             for batch_folder in batch_folders:
                 figure_dir_batch = os.path.join(figure_dir, batch_folder)
                 df_list.append(GetAirSpeedBatch(os.path.join(wind_dir, batch_folder), error_fn, reduce_fn,
-                                                figure_dir=figure_dir_batch, debug_plots=True, save_plots=True))
+                                                figure_dir=figure_dir_batch, debug_plots=False, save_plots=False))
             wind_error = pd.concat(df_list, ignore_index=True)
             del df_list
 
