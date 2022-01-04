@@ -81,7 +81,7 @@ def GetSoundingData(url):
 
 def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_id, sounding_log_dir, showDebugPlot,
                     log_sounding_data,
-                    force_website_download):
+                    force_website_download, return_all_fields = False):
     """
     :param sounding_url_base:
     :param radar_data_file:
@@ -101,6 +101,9 @@ def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_
         pin = open(sounding_log_path, 'rb')
         sounding_data_logged = pickle.load(pin)
         pin.close()
+
+        if return_all_fields:
+            return sounding_data_logged
         return sounding_data_logged[0][['HGHT', 'TEMP', 'DRCT', 'SMPS', 'windU', 'windV']], sounding_data_logged[1], \
                sounding_data_logged[2]
 
@@ -154,4 +157,6 @@ def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_
         plt.legend()
         # plt.show()
 
+    if return_all_fields:
+        return sounding_data_df, location_sounding, sounding_url
     return sounding_data_df[['HGHT', 'TEMP', 'DRCT', 'SMPS', 'windU', 'windV']], location_sounding, sounding_url
