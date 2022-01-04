@@ -1,6 +1,8 @@
 from InterpolateData import *
 from RadarHCAUtils import *
+from ClfUtils import classify_echoes
 from SoundingDataUtils import *
+from NexradUtils import *
 from VADMaskEnum import VADMask
 from VADUtils import VADWindProfile
 
@@ -113,27 +115,6 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     plt.close()
 
     return
-
-
-def classify_echoes(X, bi_clf_path, bi_norm_stats=None):
-    # TODO load directly from bi_norm_stats
-    norm_stats_bi = {
-        'mean': pd.Series(data={'ZDR': 2.880010, 'pdp': 112.129741, 'RHV': 0.623049}, index=['ZDR', 'pdp', 'RHV']),
-        'standard deviation': pd.Series(data={'ZDR': 2.936261, 'pdp': 52.774116, 'RHV': 0.201977},
-                                        index=['ZDR', 'pdp', 'RHV'])}
-
-    # Load bird-insect classifier.
-    pin = open(bi_clf_path, 'rb')
-    bi_clf = pickle.load(pin)
-    pin.close()
-
-    # Normalize X for bi.
-    X_bi = X - norm_stats_bi['mean']
-    X_bi = X.div(norm_stats_bi['standard deviation'], axis=1)
-    X_bi = np.array(X_bi)
-    y_bi = bi_clf['model'].predict(X_bi)
-
-    return y_bi
 
 
 def InterpolateWindComponents(windU, windV, height_grid, height_grid_interp, max_height_diff, max_height,
@@ -252,6 +233,40 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
 
     return df_interp
 
+def PrepareAnalyzeWindInputs(radar_data_file, batch_folder, radar_data_folder, hca_data_folder, clf_file, is_batch):
+    if is_batch:
+        start_day = int(radar_data_file[10:12])
+        stop_day = start_day
+
+        date_pattern = "*{}_V06*".format("".join([radar_data_file[:10], "{}*"]))
+        hca_data_folder = os.path.join(hca_data_folder, batch_folder)
+        batch_folder_path_radar = os.path.join(radar_data_folder, batch_folder)
+        radar_scans_day = GetFileListRadar(batch_folder_path_radar, start_day=start_day, stop_day=stop_day,
+                                           date_pattern=date_pattern)
+        l3_files_dic = GetFileListL3(hca_data_folder)
+
+        # find subpath for radar file
+        radar_subpath = None
+        for key in radar_scans_day.keys():
+            for element in radar_scans_day[key]:
+                if element.endswith(radar_data_file):
+                    radar_subpath = element
+                    break
+
+        data_table, radar_obj, hca_vol = PrepareDataTable(batch_folder_path_radar,
+                                                          radar_subpath,
+                                                          hca_data_folder, l3_files_dic,
+                                                          max_range=400,
+                                                          clf_file=clf_file)
+
+        target_folder = os.path.split(radar_subpath)
+        radar_data_file = target_folder[1]
+        radar_data_folder = os.path.join(radar_data_folder, batch_folder, target_folder[0])
+        return radar_data_file, radar_data_folder, data_table, radar_obj, hca_vol
+    else:
+        radar_data_folder = os.path.join(radar_data_folder, batch_folder)
+        return radar_data_file, radar_data_folder, None, None, None
+
 
 def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
                 norm_stats_file, clf_file, vad_jobs, figure_dir, max_range=300, max_height_VAD=1000,
@@ -313,6 +328,9 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     data_table["hca_bio"] = data_table["hca"] == 10.0
     data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
     data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
+
+    print(data_table.shape)
+    print(np.sum(data_table["mask_differential_reflectivity"] == data_table["mask_velocity"])/data_table.shape[0])
 
     height_binsize = 0.04  # height bins in km
     data_table["height_bin_meters"] = (np.floor(
