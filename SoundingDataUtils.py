@@ -9,6 +9,7 @@ from HaverSineDistance import GetHaverSineDistance
 
 KNOT_T_MPS = 0.514444
 
+
 def GetSoundingDateTimeFromRadarFile(radar_file):
     year = radar_file[4:8]
     month = radar_file[8:10]
@@ -78,7 +79,8 @@ def GetSoundingData(url):
     return sounding_data_df, header_units, meta_data_dic
 
 
-def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_id, sounding_log_dir, showDebugPlot, log_sounding_data,
+def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_id, sounding_log_dir, showDebugPlot,
+                    log_sounding_data,
                     force_website_download):
     """
     :param sounding_url_base:
@@ -99,7 +101,8 @@ def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_
         pin = open(sounding_log_path, 'rb')
         sounding_data_logged = pickle.load(pin)
         pin.close()
-        return sounding_data_logged
+        return sounding_data_logged[0][['HGHT', 'TEMP', 'DRCT', 'SMPS', 'windU', 'windV']], sounding_data_logged[1], \
+               sounding_data_logged[2]
 
     sounding_data_df, header_units, meta_data = GetSoundingData(sounding_url)
 
@@ -136,7 +139,7 @@ def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_
     # Save sounding data.
     if log_sounding_data:
         out_data = (
-        sounding_data_df[['HGHT', 'TEMP', 'DRCT', 'SMPS', 'windU', 'windV']], location_sounding, sounding_url)
+            sounding_data_df, location_sounding, sounding_url)
         with open(sounding_log_path, 'wb') as sd:
             pickle.dump(out_data, sd)
         sd.close()
