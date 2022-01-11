@@ -65,7 +65,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     ax[1].legend()
     fig.suptitle(title_str)
     if save_plots:
-        plt.savefig(os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_spherical.png"])))
+        plt.savefig(os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_spherical.png"])), dpi=200)
 
     # Plot for U and V wind components.
     plt.figure()
@@ -110,7 +110,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     plt.legend(ncol=3)
     plt.tight_layout()
     if save_plots:
-        plt.savefig(os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_components.png"])))
+        plt.savefig(os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_components.png"])), dpi=200)
     plt.show()
     plt.close()
 
@@ -233,6 +233,7 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
 
     return df_interp
 
+
 def PrepareAnalyzeWindInputs(radar_data_file, batch_folder, radar_data_folder, hca_data_folder, clf_file, is_batch):
     if is_batch:
         start_day = int(radar_data_file[10:12])
@@ -330,7 +331,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
 
     print(data_table.shape)
-    print(np.sum(data_table["mask_differential_reflectivity"] == data_table["mask_velocity"])/data_table.shape[0])
+    print(np.sum(data_table["mask_differential_reflectivity"] == data_table["mask_velocity"]) / data_table.shape[0])
 
     height_binsize = 0.04  # height bins in km
     data_table["height_bin_meters"] = (np.floor(
@@ -365,7 +366,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     vad_profiles_job = {}
     for vad_mask in vad_jobs:
         wind_profile_vad = VADWindProfile(signal_func, vad_heights, vad_mask, data_table,
-                                          showDebugPlot = show_vad_plot)
+                                          showDebugPlot=show_vad_plot)
         vad_profiles_job[vad_mask] = wind_profile_vad
 
     # Interpolate wind components.
