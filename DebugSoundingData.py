@@ -135,9 +135,6 @@ def Main():
                 ax[plot_idx // ncols][plot_idx % ncols].grid(True)
             # plt.show()
 
-            counter += 1
-            if counter == 1:
-                break
 
     plt.tight_layout()
 
