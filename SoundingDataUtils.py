@@ -6,10 +6,36 @@ import urllib.request
 import numpy as np
 import matplotlib.pyplot as plt
 from HaverSineDistance import GetHaverSineDistance
+import Station
 
 KNOT_T_MPS = 0.514444
 
+DAYS_PER_MONTH = {'01': 31, '02': 28, '03': 31, '04': 30, '05': 31, '06': 30, '07': 31, '08': 31, '09': 30, '10': 31,
+                  '11': 30, '12': 31}
 
+# TODO Consider leap years.
+def GetSoundingDateTime(year='2018', month='05', day='01', hhmm='00'):
+    day = int(day)
+    hhmm_int = round(int(hhmm[0:2]) + int(hhmm[2:4]) / 60)
+
+    # Find closest sounding
+    sounding_hh = (hhmm_int // 12 + int((hhmm_int % 12) > 6)) * 12
+
+    if sounding_hh == 24:
+        day = day + 1
+        # TODO need to check for leap years.
+        if day > DAYS_PER_MONTH[month]:
+            day = day % DAYS_PER_MONTH[month]
+            month = int(month) + 1
+            month = str(month) if month >= 10 else '0' + str(month)
+        sounding_hh = 0
+    day = ''.join(['0', str(day)]) if day < 10 else str(day)
+    sounding_hh = ''.join(['0', str(sounding_hh)]) if sounding_hh < 10 else str(sounding_hh)
+    sounding_ddhh = ''.join([day, sounding_hh])
+
+    return year, month, sounding_ddhh
+
+# TODO Consider leap years.
 def GetSoundingDateTimeFromRadarFile(radar_file):
     year = radar_file[4:8]
     month = radar_file[8:10]
@@ -24,7 +50,11 @@ def GetSoundingDateTimeFromRadarFile(radar_file):
 
     if sounding_hh == 24:
         day = day + 1
-        # TODO need to check if day is valid for the current month.
+        # TODO need to check for leap years.
+        if day > DAYS_PER_MONTH[month]:
+            day = day % DAYS_PER_MONTH[month]
+            month = int(month) + 1
+            month = str(month) if month >= 10 else '0' + str(month)
         sounding_hh = 0
     day = ''.join(['0', str(day)]) if day < 10 else str(day)
     sounding_hh = ''.join(['0', str(sounding_hh)]) if sounding_hh < 10 else str(sounding_hh)
@@ -81,7 +111,7 @@ def GetSoundingData(url):
 
 def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_id, sounding_log_dir, showDebugPlot,
                     log_sounding_data,
-                    force_website_download, return_all_fields = False):
+                    force_website_download, return_all_fields=False):
     """
     :param sounding_url_base:
     :param radar_data_file:
@@ -95,7 +125,8 @@ def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_
     print(sounding_url)
 
     # Load sounding data if local copy exists.
-    sounding_log_path = os.path.join(sounding_log_dir, timestamp + ".pkl")
+    log_filename = "".join([station_id, '_', timestamp, '.pkl'])
+    sounding_log_path = os.path.join(sounding_log_dir, log_filename)
     if not force_website_download and os.path.exists(sounding_log_path):
         print("Loading local copy of sounding data.... ")
         pin = open(sounding_log_path, 'rb')
@@ -160,3 +191,68 @@ def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_
     if return_all_fields:
         return sounding_data_df, location_sounding, sounding_url
     return sounding_data_df[['HGHT', 'TEMP', 'DRCT', 'SMPS', 'windU', 'windV']], location_sounding, sounding_url
+
+
+def GetSoundingStations(sounding_stations_path=None):
+    if not sounding_stations_path:
+        sounding_stations_path = 'sounding_logs/wyoming_sounding_stations.pkl'
+
+    with open(sounding_stations_path, 'rb') as p_in:
+        sounding_stations = pickle.load(p_in)
+    p_in.close()
+
+    return sounding_stations
+
+
+# TODO
+# Add capability of updating sounding table with missed soundings.
+def GetSoundingsTable(sounding_stations=None, year='2018', month='07', ddhh="0212",
+                      sounding_url_base="http://weather.uwyo.edu/cgi-bin/sounding?region=naconf&TYPE=TEXT%3ALIST&YEAR={}&MONTH={}&FROM={}&TO={}&STNM={}",
+                      to_save=False, force_download=False):
+    output_path = './sounding_logs/wyoming_sounding_locations.pkl'
+    if not force_download and os.path.isfile(output_path):
+        with open(output_path, 'rb') as p_in:
+            soundings_location_table = pickle.load(p_in)
+        p_in.close()
+        return soundings_location_table
+
+    soundings_location_table = {}
+    unavailable_soundings = []
+    for station_id in sounding_stations:
+        print("Collecting coordinates for ", sounding_stations[station_id][1], ", ", sounding_stations[station_id][2],
+              ", ", sounding_stations[station_id][3])
+        sounding_url = sounding_url_base.format(year, month, ddhh, ddhh, station_id)
+        sounding_data_df, header_units, meta_data = GetSoundingData(sounding_url)
+        if sounding_data_df is None:
+            print("Sounding unavailable")
+            unavailable_soundings.append(station_id)
+            continue
+
+        soundings_location_table[station_id] = {'latitude': float(meta_data['Station latitude']),
+                                                'longitude': float(meta_data['Station longitude']),
+                                                'elevation': float(meta_data['Station elevation'])}
+    print(unavailable_soundings)
+
+    if to_save:
+        with open(output_path, 'wb') as p_out:
+            pickle.dump(soundings_location_table, p_out)
+        p_out.close()
+
+    return soundings_location_table
+
+# TODO
+# Delete Main()
+# def Main():
+#     sounding_stations = GetSoundingStations()
+#
+#     year = "2018"
+#     month = "07"
+#     ddhh = "0212"
+#     sounding_url_base = "http://weather.uwyo.edu/cgi-bin/sounding?region=naconf&TYPE=TEXT%3ALIST&YEAR={}&MONTH={}&FROM={}&TO={}&STNM={}"
+#     soundings_table = GetSoundingsTable(sounding_stations, year, month, ddhh, sounding_url_base, to_save=True,
+#                                         force_download=True)
+#
+#     return
+#
+#
+# Main()
