@@ -2,7 +2,9 @@ import os
 import pickle
 import fnmatch
 from RadarHCAUtils import *
-from AnalyzeWind import classify_echoes
+from ClfUtils import classify_echoes
+from HaverSineDistance import GetHaverSineDistance
+
 
 def GetFileListL3(batch_folder_path):
     """
@@ -51,6 +53,7 @@ def GetFileListRadar(batch_folder_path, start_day, stop_day, date_pattern):
         filelist_dic[pattern[1:13]] = filtered_files
     return filelist_dic
 
+
 def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l3, l3_files_dic, max_range,
                      height_binsize=0.04, clf_file=None):
     # Read radar volume.
@@ -86,7 +89,107 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
     X.rename(columns={"differential_phase": "pdp"}, inplace=True)
     X.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
     data_table['BIClass'] = -1
-    data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file)
+    if not X.empty:
+        data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file)
 
     return data_table, radar_obj, hca_vol
 
+
+def GetNexradTable(radar_base_folder, radar_folder_table, save_table=False, force_collection=False):
+    output_path = os.path.join(radar_base_folder, 'nexrad_location_table.pkl')
+
+    if not force_collection and os.path.isfile(output_path):
+        print("Loading local copy of NEXRAD table ...")
+        with open(output_path, 'rb') as p_in:
+            radar_table = pickle.load(p_in)
+        p_in.close()
+        return radar_table
+
+    radar_folder_table = os.path.join(radar_base_folder, radar_folder_table)
+    radar_files = os.listdir(radar_folder_table)
+    radar_table = {}
+
+    for radar_file in radar_files:
+        radar_obj = pyart.io.read_nexrad_archive(os.path.join(radar_folder_table, radar_file))
+        print("Obtaining location for ", radar_file[:4])
+        radar_table[radar_file[:4]] = {"latitude": radar_obj.latitude['data'][0],
+                                       "longitude": radar_obj.longitude['data'][0],
+                                       "height": radar_obj.altitude['data'][0]}
+
+    if save_table:
+        with open(output_path, 'wb') as p_out:
+            pickle.dump(radar_table, p_out)
+        p_out.close()
+
+    return radar_table
+
+
+def RadarToOthersDistance(radar_id, nexrad_table):
+    if radar_id not in nexrad_table:
+        print(radar_id, " not found in nexrad table. Returning ...")
+        return None
+    self_location = nexrad_table[radar_id]
+    self_t_others = []
+
+    for other_id in nexrad_table:
+        if other_id == radar_id:
+            continue
+        self_t_others.append((other_id, GetHaverSineDistance(self_location["latitude"], self_location["longitude"],
+                                                             nexrad_table[other_id]["latitude"],
+                                                             nexrad_table[other_id]["longitude"])))
+    # sort by distance
+    self_t_others = sorted(self_t_others, key=lambda x: x[1])
+
+    return self_t_others
+
+
+def RadarXRadarDistance(nexrad_table, output_folder, to_save=False, force_update=False):
+    output_path = os.path.join(output_folder, 'RadarXRadarDistances.pkl')
+
+    if not force_update and os.path.isfile(output_path):
+        print("Loading local copy of RadarXRadarDistance ...")
+        with open(output_path, 'rb') as p_in:
+            radars_t_radars_dist = pickle.load(p_in)
+        p_in.close()
+        return radars_t_radars_dist
+
+    radars_t_radars_dist = {}
+    for radar_id in nexrad_table:
+        radars_t_radars_dist[radar_id] = RadarToOthersDistance(radar_id, nexrad_table)
+
+    if to_save:
+        with open(output_path, 'wb') as p_out:
+            pickle.dump(radars_t_radars_dist, p_out)
+        p_out.close()
+
+    return radars_t_radars_dist
+
+def GetRadarsWithinRadius(radar_id, radius_km, radar_x_radar_dist):
+    radius_m = radius_km * 1e3
+    if radar_id not in radar_x_radar_dist:
+        print(radar_id, " not found in radar x radar distance table.")
+        return []
+
+    self_t_other_sorted = radar_x_radar_dist[radar_id]
+    num_other = len(self_t_other_sorted)
+
+    idx = 0
+    while idx < num_other and self_t_other_sorted[idx][1] <= radius_m:
+        idx += 1
+
+    return self_t_other_sorted[:idx]
+
+
+# TODO
+# None
+def Main():
+    radar_base_folder = "./radar_data"
+    radar_folder_table = "radar_table_files"
+    radar_table = GetNexradTable(radar_base_folder=radar_base_folder, radar_folder_table=radar_folder_table,
+                                 save_table=True, force_collection=False)
+    radar_x_radar = RadarXRadarDistance(radar_table, radar_base_folder, to_save=True, force_update=False)
+    print(radar_x_radar['KTLX'][:10])
+    tmp = GetRadarsWithinRadius('KTLX',260,radar_x_radar)
+    print(tmp)
+
+# Main()
