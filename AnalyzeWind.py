@@ -2,8 +2,10 @@ from InterpolateData import *
 from RadarHCAUtils import *
 from ClfUtils import classify_echoes
 from SoundingDataUtils import *
+from RapUtils import *
 from NexradUtils import *
 from VADMaskEnum import VADMask
+from TrueWindEnum import *
 from VADUtils import VADWindProfile
 
 font = {'family': 'DejaVu Sans',
@@ -11,14 +13,19 @@ font = {'family': 'DejaVu Sans',
         'size': 11}
 plt.rc('font', **font)
 
-
 # TODO
 # need check for if sounding is available.
 # Might need to tune for best availability threshold.
+
+RAP_FILE_BASE = "rapanl_130_{}{}{}{}.g2.tar"
+
+
 def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_jobs, title_str, prop_str,
-                   output_folder, figure_prefix, save_plots):
+                   output_folder, figure_prefix, save_plots, figure_suffix=''):
     if not os.path.isdir(output_folder):
         os.makedirs(output_folder)
+
+    figure_suffix = figure_suffix.replace(' ', '_')
 
     red_color_wheel = {VADMask.weather: "gold", VADMask.insects: "tomato", VADMask.birds: "lime"}
     blue_color_wheel = {VADMask.weather: "deepskyblue", VADMask.insects: "blueviolet", VADMask.birds: "cornflowerblue"}
@@ -48,11 +55,11 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     ax[0].scatter(sounding_wind_df["DRCT"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
                   marker='o', color="blue", alpha=0.4)
     ax[0].plot(sounding_wind_df["DRCT"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
-               label="sound dir", color="blue", linestyle='dashed', alpha=0.8)
+               label="wind dir", color="blue", linestyle='dashed', alpha=0.8)
     ax[1].scatter(sounding_wind_df["SMPS"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
                   color="red", marker='o', alpha=0.4)
     ax[1].plot(sounding_wind_df["SMPS"][sounding_plot_idx], sounding_wind_df['HGHT'][sounding_plot_idx],
-               label="Sound spd", color="red", linestyle='dashed', alpha=0.8)
+               label="wind spd", color="red", linestyle='dashed', alpha=0.8)
 
     ax[0].set_xlim(0, 360)
     ax[0].set_ylim(0, 1.4 * max_height)
@@ -65,7 +72,9 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     ax[1].legend()
     fig.suptitle(title_str)
     if save_plots:
-        plt.savefig(os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_spherical.png"])), dpi=200)
+        plt.savefig(
+            os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_spherical_", figure_suffix, ".png"])),
+            dpi=200)
 
     # Plot for U and V wind components.
     plt.figure()
@@ -110,7 +119,9 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     plt.legend(ncol=3)
     plt.tight_layout()
     if save_plots:
-        plt.savefig(os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_components.png"])), dpi=200)
+        plt.savefig(os.path.join(output_folder,
+                                 "".join([figure_prefix, "_wind_comparison_components_", figure_suffix, ".png"])),
+                    dpi=200)
     plt.show()
     plt.close()
 
@@ -164,6 +175,11 @@ def InterpolateWindComponents(windU, windV, height_grid, height_grid_interp, max
     return windU_interp, windV_interp, height_grid_interp
 
 
+"""
+Interpolate wind U and V components from sounding and rap 130.
+"""
+
+
 def InterpolateSoundingWind(sounding_df, height_grid_interp, max_height_diff, max_height):
     height_grid = sounding_df['HGHT']
     windU = sounding_df['windU']
@@ -188,12 +204,11 @@ def InterpolateSoundingWind(sounding_df, height_grid_interp, max_height_diff, ma
     df_interp = pd.DataFrame(
         {'HGHT': height_grid_interp, 'windU': windU_interp, 'windV': windV_interp})
 
-    df_interp['TEMP'] = np.nan
-    df_interp['TEMP'][idx_height_interp] = sounding_df['TEMP'][idx_height]
-    df_interp['DRCT'] = np.nan
-    df_interp['DRCT'][idx_height_interp] = sounding_df['DRCT'][idx_height]
-    df_interp['SMPS'] = np.nan
-    df_interp['SMPS'][idx_height_interp] = sounding_df['SMPS'][idx_height]
+    remnant_variables = set(sounding_df.columns) - set(df_interp.columns)
+    for remnant_var in remnant_variables:
+        df_interp[remnant_var] = np.nan
+        df_interp[remnant_var][idx_height_interp] = sounding_df[remnant_var][idx_height]
+
     df_interp = df_interp.sort_values(by=['HGHT'])
 
     return df_interp
@@ -272,14 +287,17 @@ def PrepareAnalyzeWindInputs(radar_data_file, batch_folder, radar_data_folder, h
 def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
                 norm_stats_file, clf_file, vad_jobs, figure_dir, max_range=300, max_height_VAD=1000,
                 match_radar_and_sounding_grid=True, save_wind_figure=False, radar=None, hca_vol=None, data_table=None,
-                l3_filelist=None, vad_debug_params=None):
+                l3_filelist=None, vad_debug_params=None, ground_truth_source=WindSource.sounding, rap_folder=None,
+                log_dir_rap='./atmospheric_model_data/UV_wind_logs',
+                log_file_base_rap='{}_windcomponents_lat_{}_lon_{}.pkl'):
     radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
+    radar_name, year, month, day, hh, mm, ss = read_info_from_radar_name(radar_data_file)
 
     # Sounding.
-    radar_name, year, month, day, hh, mm, ss = read_info_from_radar_name(radar_data_file)
     station_id = station_infos[radar_t_sounding[radar_name]][0]
-    station_desc = station_infos[radar_t_sounding[radar_name]][1]
     sounding_url_base = "http://weather.uwyo.edu/cgi-bin/sounding?region=naconf&TYPE=TEXT%3ALIST&YEAR={}&MONTH={}&FROM={}&TO={}&STNM={}"
+
+    gt_desc = GetWindSourceDescription(ground_truth_source)
 
     if not os.path.isdir(sounding_log_dir):
         os.makedirs(sounding_log_dir)
@@ -293,19 +311,38 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                       "height": radar.altitude['data'][0]}
 
     # Sounding wind profile.
-    year_sounding, month_sounding, ddhh_sounding = GetSoundingDateTimeFromRadarFile(radar_data_file)
-    sounding_wind_df, sounding_location, sounding_url = GetSoundingWind(sounding_url_base, radar_data_file,
-                                                                        location_radar,
-                                                                        station_id, sounding_log_dir,
-                                                                        showDebugPlot=False, log_sounding_data=True,
-                                                                        force_website_download=False)
-    if sounding_wind_df is None:
-        print("Sounding data is not available for this scan. Aborting wind analysis ...")
-        return None, None, None
+    if ground_truth_source == WindSource.sounding:
+        print("Ground truth wind is sounding.")
+        year_sounding, month_sounding, gt_wind_ddhh = GetSoundingDateTimeFromRadarFile(radar_data_file)
+        gt_wind_df, gt_wind_location, sounding_url = GetSoundingWind(sounding_url_base, radar_data_file,
+                                                                     location_radar,
+                                                                     station_id, sounding_log_dir,
+                                                                     showDebugPlot=False, log_sounding_data=True,
+                                                                     force_website_download=False)
+        gt_loc_desc = station_infos[radar_t_sounding[radar_name]][1]
+        if gt_wind_df is None:
+            print("Sounding data is not available for this scan. Aborting wind analysis ...")
+            return None, None, None
+    elif ground_truth_source == WindSource.rap_130:
+        print("Ground truth wind is rap 130.")
+        rap_file = RAP_FILE_BASE.format(year, month, day, hh)
+        gt_wind_df, gt_wind_location = GetRapWindProfileRelativeToRadar(location_radar['latitude'],
+                                                                        location_radar['longitude'], location_radar,
+                                                                        rap_folder, rap_file, log_dir_rap,
+                                                                        log_file_base_rap, show_fig=False,
+                                                                        force_update=False,
+                                                                        save_wind_profile=True)
+        gt_wind_ddhh = ''.join([day, hh])
+        gt_loc_desc = "Lat {}{}, Lon {}{}".format(round(location_radar['latitude'], 2), '$^{\circ}$',
+                                                  round(location_radar['longitude'], 2),
+                                                  '$^{\circ}$')
+    else:
+        print("Unknown ground truth source specified. Terminating program ...")
+        quit()
 
     distance_radar_sounding = GetHaverSineDistance(location_radar["latitude"], location_radar["longitude"],
-                                                   sounding_location["latitude"],
-                                                   sounding_location["longitude"])
+                                                   gt_wind_location["latitude"],
+                                                   gt_wind_location["longitude"])
     distance_radar_sounding = round(distance_radar_sounding / 1000, 2)
 
     # Read HCA data.
@@ -323,30 +360,30 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     # Data table.
     if data_table is None:
         data_table = MergeRadarAndHCAUpdate(radar, hca_vol, max_range)
+        # TODO Precious. Get original ZDR mask.
+        data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
+        data_table["hca_bio"] = data_table["hca"] == 10.0
+        data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
+        data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
 
-    # TODO Precious. Get original ZDR mask.
-    data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
-    data_table["hca_bio"] = data_table["hca"] == 10.0
-    data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
-    data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
+        print(data_table.shape)
+        print(np.sum(data_table["mask_differential_reflectivity"] == data_table["mask_velocity"]) / data_table.shape[0])
 
-    print(data_table.shape)
-    print(np.sum(data_table["mask_differential_reflectivity"] == data_table["mask_velocity"]) / data_table.shape[0])
+        height_binsize = 0.04  # height bins in km
+        data_table["height_bin_meters"] = (np.floor(
+            data_table["height"] / height_binsize) + 1) * height_binsize - height_binsize / 2
+        data_table["height_bin_meters"] *= 1000
 
-    height_binsize = 0.04  # height bins in km
-    data_table["height_bin_meters"] = (np.floor(
-        data_table["height"] / height_binsize) + 1) * height_binsize - height_binsize / 2
-    data_table["height_bin_meters"] *= 1000
-
-    # Apply bird-insect classifier. -1 is non-bio, 1 is bird and 0 is insects.
-    echo_mask = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
-    X = data_table.loc[
-        echo_mask, ['differential_reflectivity', 'differential_phase', 'cross_correlation_ratio']]
-    X.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
-    X.rename(columns={"differential_phase": "pdp"}, inplace=True)
-    X.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
-    data_table['BIClass'] = -1
-    data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file)
+        # Apply bird-insect classifier. -1 is non-bio, 1 is bird and 0 is insects.
+        echo_mask = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
+        X = data_table.loc[
+            echo_mask, ['differential_reflectivity', 'differential_phase', 'cross_correlation_ratio']]
+        X.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
+        X.rename(columns={"differential_phase": "pdp"}, inplace=True)
+        X.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
+        data_table['BIClass'] = -1
+        if not X.empty:
+            data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file)
 
     # Visualize data table.
     color_map = GetDataTableColorMap()
@@ -375,13 +412,13 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     height_grid_interp = wind_profile_vad['height']
     height_grid_interp = height_grid_interp[height_grid_interp < max_height]
 
-    # Match, interpolate VAD and sounding grid
+    # Match, interpolate VAD and sounding/rap grid
     if match_radar_and_sounding_grid:
-        sounding_wind_df_interp = InterpolateSoundingWind(sounding_df=sounding_wind_df,
-                                                          height_grid_interp=height_grid_interp,
-                                                          max_height_diff=max_height_diff,
-                                                          max_height=max_height)
-        height_grid_interp = sounding_wind_df['HGHT']
+        gt_wind_df_interp = InterpolateSoundingWind(sounding_df=gt_wind_df,
+                                                    height_grid_interp=height_grid_interp,
+                                                    max_height_diff=max_height_diff,
+                                                    max_height=max_height)
+        height_grid_interp = gt_wind_df['HGHT']
         height_grid_interp = height_grid_interp[height_grid_interp < max_height]
         vad_profiles_job_interp = {}
         for vad_mask in vad_jobs:
@@ -403,22 +440,22 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     prop_str = "{}% birds, {}% insects, {}% weather".format(prop_birds, prop_insects, prop_weather)
     echo_dist_VAD = {'bird': prop_birds, 'insects': prop_insects, 'weather': prop_weather}
 
-    title_str = "{}, {}/{}/{}, {}:{}:{} UTC.\n{} km from {} UTC {} sounding.".format(
+    title_str = "{}, {}/{}/{}, {}:{}:{} UTC.\n{} km from {} UTC, {} {}.".format(
         radar_name, year, month,
         day, hh, mm, ss,
         distance_radar_sounding,
-        ddhh_sounding[2:],
-        station_desc)
+        gt_wind_ddhh[2:],
+        gt_loc_desc, gt_desc)
 
     description_jobs = {VADMask.biological: ("bio", "."), VADMask.insects: ("ins", "2"),
                         VADMask.weather: ("wea", "d"), VADMask.birds: ("bir", "^")}
     figure_prefix = os.path.splitext(radar_data_file)[0]
 
     if match_radar_and_sounding_grid:
-        VisualizeWinds(vad_profiles_job_interp, sounding_wind_df_interp, 1100, description_jobs, title_str, prop_str,
+        VisualizeWinds(vad_profiles_job_interp, gt_wind_df_interp, 1100, description_jobs, title_str, prop_str,
                        figure_dir, figure_prefix, save_wind_figure)
-        return vad_profiles_job_interp, sounding_wind_df_interp, echo_dist_VAD
+        return vad_profiles_job_interp, gt_wind_df_interp, echo_dist_VAD
 
-    VisualizeWinds(vad_profiles_job, sounding_wind_df, 1100, description_jobs, title_str, prop_str,
-                   figure_dir, figure_prefix, save_wind_figure)
-    return vad_profiles_job, sounding_wind_df, echo_dist_VAD
+    VisualizeWinds(vad_profiles_job, gt_wind_df, 1100, description_jobs, title_str, prop_str,
+                   figure_dir, figure_prefix, save_wind_figure, figure_suffix=gt_desc)
+    return vad_profiles_job, gt_wind_df, echo_dist_VAD
