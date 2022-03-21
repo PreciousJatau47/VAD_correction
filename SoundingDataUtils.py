@@ -9,9 +9,11 @@ from HaverSineDistance import GetHaverSineDistance
 import Station
 
 KNOT_T_MPS = 0.514444
+SOUNDING_URL_BASE = "http://weather.uwyo.edu/cgi-bin/sounding?region=naconf&TYPE=TEXT%3ALIST&YEAR={}&MONTH={}&FROM={}&TO={}&STNM={}"
 
 DAYS_PER_MONTH = {'01': 31, '02': 28, '03': 31, '04': 30, '05': 31, '06': 30, '07': 31, '08': 31, '09': 30, '10': 31,
                   '11': 30, '12': 31}
+
 
 # TODO Consider leap years.
 def GetSoundingDateTime(year='2018', month='05', day='01', hhmm='00'):
@@ -34,6 +36,7 @@ def GetSoundingDateTime(year='2018', month='05', day='01', hhmm='00'):
     sounding_ddhh = ''.join([day, sounding_hh])
 
     return year, month, sounding_ddhh
+
 
 # TODO Consider leap years.
 def GetSoundingDateTimeFromRadarFile(radar_file):
@@ -61,6 +64,11 @@ def GetSoundingDateTimeFromRadarFile(radar_file):
     sounding_ddhh = ''.join([day, sounding_hh])
 
     return year, month, sounding_ddhh
+
+
+def GetSoundingUrl(station_id, year, month, sounding_ddhh):
+    sounding_url = SOUNDING_URL_BASE.format(year, month, sounding_ddhh, sounding_ddhh, station_id)
+    return sounding_url
 
 
 def GetSoundingUrlFromRadarFile(sounding_url_base, radar_file, station_id):
