@@ -58,11 +58,14 @@ def WeightedMean(x_arr, x_key, left_part, right_part, y_arr, max_delta_x = None)
 def Interpolate(x, y, x_interp, max_delta_x):
     y_interp = np.empty(x_interp.shape)
     y_interp[:] = np.nan
+    x_interp = x_interp.reset_index(drop=True)
 
     # sort x, y -> O(n)
     i_x = np.argsort(x)
     x = x[i_x]
+    x = x.reset_index(drop = True)
     y = y[i_x]
+    y = y.reset_index(drop = True)
 
     for i in range(len(x_interp)):
         x_key = x_interp[i]
@@ -73,12 +76,17 @@ def Interpolate(x, y, x_interp, max_delta_x):
                 if left_part > 0:
                     right_part = left_part + 1
                     left_part -= 1
+                    unique_els = y[left_part:right_part + 1].unique()
+                    if right_part == len(x) or (len(unique_els) == 1 and math.isnan(unique_els[0])):
+                        continue
                     y_interp[i] = WeightedMean(x, x_key, left_part, right_part, y, max_delta_x)
             else:
                 y_interp[i] = y[left_part]
         else:  # not found in array
             if left_part >= 0 and left_part < len(x) - 1:
                 right_part = left_part + 1
+                if right_part == len(x):
+                    continue
                 y_interp[i] = WeightedMean(x, x_key, left_part, right_part, y, max_delta_x)
 
     return y_interp
