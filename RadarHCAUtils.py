@@ -30,14 +30,15 @@ def read_info_from_radar_name(radar_file):
 
 
 def GetHcaPathFromFileList(hca_day_folder, radar_file, hca_el, el_desc_hca, filelist):
-    suffix = "".join(["SDUS84_", el_desc_hca[hca_el], "{}_{}{}{}{}"])
+    suffix = "".join(["{}_", el_desc_hca[hca_el], "{}_{}{}{}{}"])
 
+    sdus_id = next(iter(filelist))[:6]
     radar_name = radar_file[:4]
     year = radar_file[4:8]
     month = radar_file[8:10]
     day = radar_file[10:12]
     hhmm = radar_file[13:17]
-    suffix = suffix.format(radar_name[1:], year, month, day, hhmm)
+    suffix = suffix.format(sdus_id, radar_name[1:], year, month, day, hhmm)
 
     if suffix in filelist.keys():
         target_folder = os.path.join(hca_day_folder, filelist[suffix])
@@ -49,6 +50,7 @@ def GetHcaVolFromFileList(hca_day_folder, radar_file, filelist):
     el_desc_hca = {0.5: "N0H", 1.5: "N1H", 2.5: "N2H", 3.5: "N3H"}
     volume_hca = {}
     for el_hca in el_desc_hca.keys():
+        print(GetHcaPathFromFileList(hca_day_folder, radar_file, el_hca, el_desc_hca, filelist))
         volume_hca[el_hca] = pyart.io.read_nexrad_level3(
             GetHcaPathFromFileList(hca_day_folder, radar_file, el_hca, el_desc_hca, filelist))
     print(volume_hca[el_hca].fields['radar_echo_classification']['options'])
@@ -155,7 +157,8 @@ def GetDataTableColorMap():
     return cmap
 
 
-def VisualizeDataTable(data_table, color_map, output_folder, scan_name=None, title_suffix=None, combine_plots=True):
+def VisualizeDataTable(data_table, color_map, output_folder, scan_name=None, title_suffix=None, combine_plots=True,
+                       correct_hca_weather=False):
     if not os.path.isdir(output_folder):
         os.makedirs(output_folder)
 
@@ -177,8 +180,11 @@ def VisualizeDataTable(data_table, color_map, output_folder, scan_name=None, tit
 
     products = list(color_map.keys())
     for product in products:
+        out_product_name = "".join([product, '_corrected']) if (
+                    product in {"hca_weather", "hca", "hca_bio", "BIClass"} and correct_hca_weather) else product
+        print(out_product_name)
 
-        product_folder = os.path.join(output_folder, product)
+        product_folder = os.path.join(output_folder, out_product_name)
         if not os.path.isdir(product_folder):
             os.makedirs(product_folder)
 
@@ -250,6 +256,8 @@ def MergeRadarAndHCAUpdate(radar, hca_volume, maxRange):
         if radar_el in hca_volume.keys():
             radar_range, radar_az_deg, _, data_slice, mask_slice, labels_slice, radar_mask = ReadRadarSliceUpdate(radar,
                                                                                                                   radar_sweep_idx)
+            print(np.nansum(radar_mask))
+
             # interpolate to common grid
             range_idxs = MatchGates(radar_range, range_common)
             az_idxs = MatchGates(radar_az_deg, az_common)

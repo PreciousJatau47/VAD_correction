@@ -7,6 +7,7 @@ from NexradUtils import *
 from VADMaskEnum import VADMask
 from TrueWindEnum import *
 from VADUtils import VADWindProfile
+from collections import Counter
 
 font = {'family': 'DejaVu Sans',
         'weight': 'bold',
@@ -27,8 +28,11 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
 
     figure_suffix = figure_suffix.replace(' ', '_')
 
-    red_color_wheel = {VADMask.weather: "gold", VADMask.insects: "tomato", VADMask.birds: "lime"}
-    blue_color_wheel = {VADMask.weather: "deepskyblue", VADMask.insects: "blueviolet", VADMask.birds: "cornflowerblue"}
+    # TODO add biological echoes to colour wheel
+    red_color_wheel = {VADMask.weather: "gold", VADMask.insects: "tomato", VADMask.birds: "lime",
+                       VADMask.biological: "fuchsia"}
+    blue_color_wheel = {VADMask.weather: "deepskyblue", VADMask.insects: "blueviolet", VADMask.birds: "cornflowerblue",
+                        VADMask.biological: "darkslategray"}
 
     # Plot for speed and direction.
     fig, ax = plt.subplots(1, 2)
@@ -75,6 +79,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
         plt.savefig(
             os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_spherical_", figure_suffix, ".png"])),
             dpi=200)
+    plt.close(fig)
 
     # Plot for U and V wind components.
     plt.figure()
@@ -249,7 +254,9 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
     return df_interp
 
 
-def PrepareAnalyzeWindInputs(radar_data_file, batch_folder, radar_data_folder, hca_data_folder, clf_file, is_batch):
+def PrepareAnalyzeWindInputs(radar_data_file, batch_folder, radar_data_folder, hca_data_folder, clf_file, is_batch,
+                             norm_stats_file=None, correct_hca_weather=False, biw_norm_stats_file=None,
+                             biw_clf_file=None):
     if is_batch:
         start_day = int(radar_data_file[10:12])
         stop_day = start_day
@@ -273,7 +280,10 @@ def PrepareAnalyzeWindInputs(radar_data_file, batch_folder, radar_data_folder, h
                                                           radar_subpath,
                                                           hca_data_folder, l3_files_dic,
                                                           max_range=400,
-                                                          clf_file=clf_file)
+                                                          clf_file=clf_file, norm_stats_file=norm_stats_file,
+                                                          correct_hca_weather=correct_hca_weather,
+                                                          max_height_VAD=1000, biw_norm_stats_file=biw_norm_stats_file,
+                                                          biw_clf_file=biw_clf_file)
 
         target_folder = os.path.split(radar_subpath)
         radar_data_file = target_folder[1]
@@ -289,9 +299,14 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                 match_radar_and_sounding_grid=True, save_wind_figure=False, radar=None, hca_vol=None, data_table=None,
                 l3_filelist=None, vad_debug_params=None, ground_truth_source=WindSource.sounding, rap_folder=None,
                 log_dir_rap='./atmospheric_model_data/UV_wind_logs',
-                log_file_base_rap='{}_windcomponents_lat_{}_lon_{}.pkl'):
+                log_file_base_rap='{}_windcomponents_lat_{}_lon_{}.pkl', correct_hca_weather=True,
+                biw_norm_stats_file=None, biw_clf_file=None):
     radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
     radar_name, year, month, day, hh, mm, ss = read_info_from_radar_name(radar_data_file)
+
+    # Log options to command line
+    print()
+    print("Correct hca weather: \t {}".format(correct_hca_weather))
 
     # Sounding.
     station_id = station_infos[radar_t_sounding[radar_name]][0]
@@ -360,14 +375,29 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     # Data table.
     if data_table is None:
         data_table = MergeRadarAndHCAUpdate(radar, hca_vol, max_range)
+        data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
+
+        if correct_hca_weather:
+            X_biw = data_table.loc[:, ['differential_reflectivity', 'differential_phase', 'cross_correlation_ratio']]
+            X_biw.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
+            X_biw.rename(columns={"differential_phase": "pdp"}, inplace=True)
+            X_biw.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
+            data_table['BIWClass'] = -1
+            data_table.loc[:, 'BIWClass'] = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
+
+            # Correct HCA's misclassification of birds as weather within VAD region.
+            # if weather hca, and non-weather biw, and within collection region, set to biological
+            correction_msk = data_table["height"] < max_height_VAD
+            weather_hca = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
+            non_weather_biw = data_table['BIWClass'] != 3
+            correction_msk = np.logical_and(correction_msk, weather_hca)
+            correction_msk = np.logical_and(correction_msk, non_weather_biw)
+            data_table.loc[correction_msk, "hca"] = 10.0
+
         # TODO Precious. Get original ZDR mask.
         data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
         data_table["hca_bio"] = data_table["hca"] == 10.0
         data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
-        data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
-
-        print(data_table.shape)
-        print(np.sum(data_table["mask_differential_reflectivity"] == data_table["mask_velocity"]) / data_table.shape[0])
 
         height_binsize = 0.04  # height bins in km
         data_table["height_bin_meters"] = (np.floor(
@@ -383,11 +413,20 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
         X.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
         data_table['BIClass'] = -1
         if not X.empty:
-            data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file)
+            data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file, norm_stats_path=norm_stats_file)
+
+    bi_counter = Counter(data_table['BIClass'])
+    total = data_table.shape[0]
+    # for count_key in bi_counter:
+    #     bi_counter[count_key] /= total
+
+    print("BIClass distribution")
+    print(bi_counter)
 
     # Visualize data table.
-    color_map = GetDataTableColorMap()
-    # VisualizeDataTable(data_table, color_map, figure_dir, scan_name = radar_data_file, title_suffix = "", combine_plots=True)
+    # color_map = GetDataTableColorMap()
+    # VisualizeDataTable(data_table, color_map, figure_dir, scan_name=radar_data_file, title_suffix="",
+    #                    combine_plots=True, correct_hca_weather=correct_hca_weather)
 
     # VAD wind profile
     signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])

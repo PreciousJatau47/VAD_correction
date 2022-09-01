@@ -6,9 +6,9 @@ from AnalyzeWind import *
 
 def Main():
     # Radar/Sounding.
-    radar_data_file = 'KOHX20180501_000411_V06.ar2v'  # "KENX20180424_120113_V06.ar2v"  # "KENX20180410_124739_V06.ar2v"  # "KENX20180502_053506_V06.ar2v" #
+    radar_data_file = 'KOHX20180501_042926_V06.ar2v'  # "KENX20180424_120113_V06.ar2v"  # "KENX20180410_124739_V06.ar2v"  # "KENX20180502_053506_V06.ar2v" #
     radar_data_folder = "./radar_data"
-    batch_folder = "KOHX_20180501_20180515"  # "KENX_20180401_20180430"  # "KENX_20180501_20180531" #"KOHX_20180601_20180630"
+    batch_folder = "KOHX_20180501_20180515"  # "KOHX_20180501_20180515"  # "KENX_20180401_20180430"  # "KENX_20180501_20180531" #"KOHX_20180601_20180630"
     hca_data_folder = "./level3_data"
     radar_t_sounding = {'KHTX': 'BNA', 'KTLX': 'LMN', 'KOHX': 'BNA', 'KENX': 'ALB'}
     station_infos = {'LMN': ('74646', 'Lamont, Oklahoma'), 'BNA': ('72327', 'Nashville, Tennessee'),
@@ -20,21 +20,28 @@ def Main():
     rap_folder = r"./atmospheric_model_data/rap_130_20180501_20180515"
 
     # Model.
-    norm_stats_file = "./models/ridge_bi/mean_std_for_normalization_1.pkl"
+    norm_stats_file = "./models/ridge_bi/mean_std_for_normalization_2.pkl"
     clf_file = "./models/ridge_bi/RidgeRegModels_SGD_1.pkl"
+    correct_hca_weather = True
+    biw_norm_stats_file = "./models/ridge_biw/mean_std_for_normalization_with_weather.pkl"
+    biw_clf_file = "./models/ridge_biw/RidgeRegModels_SGD_weather.pkl"
 
     # VAD options
-    vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather]
+    vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather, VADMask.biological]
     # vad_debug_params = {'show_plot': True, 'vad_heights': np.array([200])}
     vad_debug_params = False
 
-    figure_dir = "./figures/temp_EM"  # TODO specify proper path.
+    figure_dir = "./figures/AnalyzeWindMainOutput"  # TODO specify proper path.
 
     radar_data_file, radar_data_folder, data_table, radar_obj, hca_vol = PrepareAnalyzeWindInputs(radar_data_file,
                                                                                                   batch_folder,
                                                                                                   radar_data_folder,
                                                                                                   hca_data_folder,
-                                                                                                  clf_file, is_batch)
+                                                                                                  clf_file, is_batch,
+                                                                                                  norm_stats_file=norm_stats_file,
+                                                                                                  correct_hca_weather=correct_hca_weather,
+                                                                                                  biw_norm_stats_file=biw_norm_stats_file,
+                                                                                                  biw_clf_file=biw_clf_file)
 
     vad_profiles, sounding_df, echo_dist = AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder,
                                                        radar_t_sounding, station_infos, sounding_log_dir,
@@ -42,8 +49,10 @@ def Main():
                                                        match_radar_and_sounding_grid=True,
                                                        save_wind_figure=False, vad_debug_params=vad_debug_params,
                                                        radar=radar_obj, hca_vol=hca_vol, data_table=data_table,
-                                                       l3_filelist=None, ground_truth_source=WindSource.rap_130,
-                                                       rap_folder = rap_folder)
+                                                       l3_filelist=None, ground_truth_source=WindSource.sounding,
+                                                       rap_folder=rap_folder, correct_hca_weather=correct_hca_weather,
+                                                       biw_norm_stats_file=biw_norm_stats_file,
+                                                       biw_clf_file=biw_clf_file)
     return
 
 
