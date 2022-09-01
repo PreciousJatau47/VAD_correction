@@ -4,26 +4,24 @@ import pickle
 import time
 import pyart
 from RadarHCAUtils import *
+from TrueWindEnum import *
 from AnalyzeWind import classify_echoes, AnalyzeWind
 from VADMaskEnum import VADMask
 from NexradUtils import *
 
 
-
-
-def GetTimeHourUTC(some_str: str) -> float:
-    idx_timestart = some_str.find('_') + 1
-    hh = some_str[idx_timestart:idx_timestart + 2]
-    mm = some_str[idx_timestart + 2:idx_timestart + 4]
-    ss = some_str[idx_timestart + 4:idx_timestart + 6]
-    time_hour = float(hh) + float(mm) / 60 + float(ss) / 3600
-    return time_hour
-
-
 def AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
                      max_height_VAD, time_window, clf_file, radar_t_sounding, station_infos, sounding_log_dir,
-                     norm_stats_file, vad_jobs, figure_dir, vad_sounding_dir):
-    vad_sounding_dir = os.path.join(vad_sounding_dir, batch_folder)
+                     norm_stats_file, vad_jobs, figure_dir, vad_sounding_dir, ground_truth_source=WindSource.sounding,
+                     rap_folder=None, correct_hca_weather=False, biw_norm_stats_file=None,
+                     biw_clf_file=None):
+    wind_source_desc = GetWindSourceDescription(ground_truth_source)
+    wind_source_desc = wind_source_desc.replace(' ', '_')
+    if correct_hca_weather:
+        vad_sounding_dir = os.path.join(vad_sounding_dir, batch_folder, 'hca_weather_corrected', wind_source_desc)
+    else:
+        vad_sounding_dir = os.path.join(vad_sounding_dir, batch_folder, 'hca_default', wind_source_desc)
+
     if not os.path.isdir(vad_sounding_dir):
         os.makedirs(vad_sounding_dir)
 
@@ -46,43 +44,68 @@ def AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_
                     time_hour > time_window['midnight'][0] or time_hour < time_window['midnight'][1])
 
             # Analyze wind
-            if is_near_sounding:
+            if is_near_sounding or ground_truth_source == WindSource.rap_130:
                 data_table, radar_obj, hca_vol = PrepareDataTable(batch_folder_path_radar,
                                                                   radar_subpath,
                                                                   batch_folder_path_l3, l3_files_dic,
                                                                   max_range=max_range,
-                                                                  clf_file=clf_file)
+                                                                  clf_file=clf_file, norm_stats_file=norm_stats_file,
+                                                                  correct_hca_weather=correct_hca_weather,
+                                                                  max_height_VAD=1000,
+                                                                  biw_norm_stats_file=biw_norm_stats_file,
+                                                                  biw_clf_file=biw_clf_file)
 
                 if radar_obj is not None:
                     target_folder = os.path.split(radar_subpath)
                     target_file = target_folder[1]
                     target_file_no_ext = os.path.splitext(target_file)[0]
                     target_folder = os.path.join(radar_folder, batch_folder, target_folder[0])
-                    wind_figure_dir = os.path.join(figure_dir, batch_folder, curr_day, 'radar_sounding_wind')
+
+                    if correct_hca_weather:
+                        wind_figure_dir = os.path.join(figure_dir, batch_folder, curr_day, 'radar_sounding_wind',
+                                                       'hca_weather_corrected', wind_source_desc)
+                    else:
+                        wind_figure_dir = os.path.join(figure_dir, batch_folder, curr_day, 'radar_sounding_wind',
+                                                       wind_source_desc)
+
                     vad_sounding_path = os.path.join(vad_sounding_dir, ''.join([target_file_no_ext, '_wind', '.pkl']))
 
                     # Takes ~16s.
                     print('Analyzing wind for ', target_file, ' ....')
-                    vad_profiles, sounding_df, echo_dist = AnalyzeWind(target_file, target_folder, batch_folder_path_l3,
-                                                                       radar_t_sounding, station_infos,
-                                                                       sounding_log_dir, norm_stats_file, clf_file,
-                                                                       vad_jobs, figure_dir=wind_figure_dir,
-                                                                       max_range=max_range,
-                                                                       max_height_VAD=max_height_VAD,
-                                                                       match_radar_and_sounding_grid=True,
-                                                                       save_wind_figure=True, radar=radar_obj,
-                                                                       hca_vol=hca_vol,
-                                                                       data_table=data_table, l3_filelist=None)
+                    vad_profiles, sounding_df, echo_dist_VAD = AnalyzeWind(target_file, target_folder,
+                                                                           batch_folder_path_l3,
+                                                                           radar_t_sounding, station_infos,
+                                                                           sounding_log_dir, norm_stats_file, clf_file,
+                                                                           vad_jobs, figure_dir=wind_figure_dir,
+                                                                           max_range=max_range,
+                                                                           max_height_VAD=max_height_VAD,
+                                                                           match_radar_and_sounding_grid=True,
+                                                                           save_wind_figure=True, radar=radar_obj,
+                                                                           hca_vol=hca_vol,
+                                                                           data_table=data_table, l3_filelist=None,
+                                                                           ground_truth_source=ground_truth_source,
+                                                                           rap_folder=rap_folder,
+                                                                           correct_hca_weather=correct_hca_weather,
+                                                                           biw_norm_stats_file=biw_norm_stats_file,
+                                                                           biw_clf_file=biw_clf_file)
 
                     with open(vad_sounding_path, 'wb') as p_out:
-                        pickle.dump({'VAD': vad_profiles, 'Sounding': sounding_df, 'echo_dist': echo_dist}, p_out)
+                        pickle.dump({'VAD': vad_profiles, 'Sounding': sounding_df, 'echo_dist': echo_dist_VAD}, p_out)
                     p_out.close()
+        plt.close('all')
     return
 
 
 def GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
-                             clf_file, output_log_dir, figure_dir, save_ppi_plots, force_output_logging):
+                             clf_file, output_log_dir, figure_dir, save_ppi_plots, force_output_logging,
+                             norm_stats_file=None, correct_hca_weather=False, biw_norm_stats_file=None,
+                             biw_clf_file=None):
     output_log_dir = os.path.join(output_log_dir, batch_folder)
+    if correct_hca_weather:
+        output_log_dir = os.path.join(output_log_dir, 'hca_weather_corrected')
+    else:
+        output_log_dir = os.path.join(output_log_dir, 'hca_default')
+
     if not os.path.isdir(output_log_dir):
         os.makedirs(output_log_dir)
 
@@ -115,7 +138,11 @@ def GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_da
             # Load data. Takes ~7s.
             data_table, radar_obj, hca_vol = PrepareDataTable(batch_folder_path_radar, radar_subpath,
                                                               batch_folder_path_l3, l3_files_dic, max_range=max_range,
-                                                              clf_file=clf_file)
+                                                              clf_file=clf_file, norm_stats_file=norm_stats_file,
+                                                              correct_hca_weather=correct_hca_weather,
+                                                              max_height_VAD=1000,
+                                                              biw_norm_stats_file=biw_norm_stats_file,
+                                                              biw_clf_file=biw_clf_file)
 
             # Echo distribution.
             if data_table is None:
@@ -144,8 +171,9 @@ def GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_da
                 title_suffix = "{}% birds, {}% insects, {}% weather.".format(prop_birds, prop_insects, prop_weather)
 
                 # 16s per plot item.
-                VisualizeDataTable(data_table=data_table, color_map=color_map, output_folder=scan_figure_dir,
-                                   scan_name=scan_name, title_suffix=title_suffix, combine_plots=True)
+                # VisualizeDataTable(data_table=data_table, color_map=color_map, output_folder=scan_figure_dir,
+                #                    scan_name=scan_name, title_suffix=title_suffix, combine_plots=True,
+                #                    correct_hca_weather=correct_hca_weather)
 
         echo_count_scan = {VADMask.birds: bird_count_scan, VADMask.insects: insect_count_scan,
                            VADMask.weather: weather_count_scan}
@@ -159,41 +187,66 @@ def GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_da
     return
 
 
+"""
+TODO
+None. 
+"""
+
+
 def Main():
     level3_folder = "./level3_data"
     radar_folder = "./radar_data"
-    force_output_logging = False
+    force_output_logging = True
     output_log_dir = "./analysis_output_logs"
     figure_dir = './figures'
     save_ppi_plots = True
 
-    batch_folder = "KOHX_20180501_20180515"
-    date_pattern = "*KOHX201805{}*_V06.*"
-    start_day = 1
-    stop_day = 15
+    batch_folder = "KOHX_20180516_20180531"
+    # date_pattern = "*KENX201804{}*_V06.*"
+    start_day = 16 #16
+    stop_day = 31 #31
     max_range = 400  # in km.
     max_height_VAD = 1000  # in m.
 
-    # Model.
-    norm_stats_file = "./models/ridge_bi/mean_std_for_normalization_1.pkl"
-    clf_file = "./models/ridge_bi/RidgeRegModels_SGD_1.pkl"
+    date_pattern = "*{}{}".format(batch_folder[:4], batch_folder[5:11])
+    date_pattern = "".join([date_pattern, '{}*_V06.*'])
 
-    # Wind analysis.
-    radar_t_sounding = {'KHTX': 'BNA', 'KTLX': 'LMN', 'KOHX': 'BNA'}
-    station_infos = {'LMN': ('74646', 'Lamont, Oklahoma'), 'BNA': ('72327', 'Nashville, Tennessee')}
+    # Model.
+    norm_stats_file = "./models/ridge_bi/mean_std_for_normalization_2.pkl"
+    clf_file = "./models/ridge_bi/RidgeRegModels_SGD_1.pkl"
+    correct_hca_weather = True
+    biw_norm_stats_file = "./models/ridge_biw/mean_std_for_normalization_with_weather.pkl"
+    biw_clf_file = "./models/ridge_biw/RidgeRegModels_SGD_weather.pkl"
+
+    # Sounding/ RAP 130.
+    ground_truth_wind = WindSource.rap_130
+
+    radar_t_sounding = {'KHTX': 'BNA', 'KTLX': 'LMN', 'KOHX': 'BNA', 'KENX': 'ALB'}
+    station_infos = {'LMN': ('74646', 'Lamont, Oklahoma'), 'BNA': ('72327', 'Nashville, Tennessee'),
+                     'ALB': ('72518', 'Albany, New York')}
     sounding_log_dir = "./sounding_logs"
-    vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather]
-    delta_time_hr = 10 / 60
+
+    rap_folder = r"./atmospheric_model_data/rap_130_20180501_20180531"
+
+    # VAD
+    vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather, VADMask.biological]
+    delta_time_hr = 2 * 60 / 60
     time_window = {'noon': (12 - delta_time_hr, 12 + delta_time_hr),
                    'midnight': (24 - delta_time_hr, (24 + delta_time_hr) % 24)}
     vad_sounding_output_dir = "./vad_sounding_comparison_logs"
 
     # GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
-    #                          clf_file, output_log_dir, figure_dir, save_ppi_plots, force_output_logging)
+    #                          clf_file, output_log_dir, figure_dir, save_ppi_plots, force_output_logging,
+    #                          norm_stats_file=norm_stats_file,
+    #                          correct_hca_weather=correct_hca_weather, biw_clf_file=biw_clf_file,
+    #                          biw_norm_stats_file=biw_norm_stats_file)
 
     AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
                      max_height_VAD, time_window, clf_file, radar_t_sounding, station_infos, sounding_log_dir,
-                     norm_stats_file, vad_jobs, figure_dir, vad_sounding_output_dir)
+                     norm_stats_file, vad_jobs, figure_dir, vad_sounding_output_dir,
+                     ground_truth_source=ground_truth_wind, rap_folder=rap_folder,
+                     correct_hca_weather=correct_hca_weather, biw_clf_file=biw_clf_file,
+                     biw_norm_stats_file=biw_norm_stats_file)
 
 
 Main()

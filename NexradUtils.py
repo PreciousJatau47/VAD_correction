@@ -6,6 +6,15 @@ from ClfUtils import classify_echoes
 from HaverSineDistance import GetHaverSineDistance
 
 
+def GetTimeHourUTC(some_str: str) -> float:
+    idx_timestart = some_str.find('_') + 1
+    hh = some_str[idx_timestart:idx_timestart + 2]
+    mm = some_str[idx_timestart + 2:idx_timestart + 4]
+    ss = some_str[idx_timestart + 4:idx_timestart + 6]
+    time_hour = float(hh) + float(mm) / 60 + float(ss) / 3600
+    return time_hour
+
+
 def GetFileListL3(batch_folder_path):
     """
     :param batch_folder_path:
@@ -55,7 +64,8 @@ def GetFileListRadar(batch_folder_path, start_day, stop_day, date_pattern):
 
 
 def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l3, l3_files_dic, max_range,
-                     height_binsize=0.04, clf_file=None):
+                     height_binsize=0.04, clf_file=None, norm_stats_file=None, correct_hca_weather=False,
+                     max_height_VAD=1000, biw_norm_stats_file=None, biw_clf_file=None):
     # Read radar volume.
     try:
         print("Opening ", os.path.join(batch_folder_path_radar, radar_subpath))
@@ -73,10 +83,28 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
         return None, None, None
 
     data_table = MergeRadarAndHCAUpdate(radar_obj, hca_vol, max_range)
+    data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
+
+    if correct_hca_weather:
+        X_biw = data_table.loc[:, ['differential_reflectivity', 'differential_phase', 'cross_correlation_ratio']]
+        X_biw.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
+        X_biw.rename(columns={"differential_phase": "pdp"}, inplace=True)
+        X_biw.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
+        data_table['BIWClass'] = -1
+        data_table.loc[:, 'BIWClass'] = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
+
+        # Correct HCA's misclassification of birds as weather within VAD region.
+        # if weather hca, and non-weather biw, and within collection region, set to biological
+        correction_msk = data_table["height"] < max_height_VAD
+        weather_hca = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
+        non_weather_biw = data_table['BIWClass'] != 3
+        correction_msk = np.logical_and(correction_msk, weather_hca)
+        correction_msk = np.logical_and(correction_msk, non_weather_biw)
+        data_table.loc[correction_msk, "hca"] = 10.0
+
     data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
     data_table["hca_bio"] = data_table["hca"] == 10.0
     data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
-    data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
 
     data_table["height_bin_meters"] = (np.floor(
         data_table["height"] / height_binsize) + 1) * height_binsize - height_binsize / 2
@@ -90,7 +118,7 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
     X.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
     data_table['BIClass'] = -1
     if not X.empty:
-        data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file)
+        data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file, norm_stats_file)
 
     return data_table, radar_obj, hca_vol
 
@@ -164,6 +192,7 @@ def RadarXRadarDistance(nexrad_table, output_folder, to_save=False, force_update
 
     return radars_t_radars_dist
 
+
 def GetRadarsWithinRadius(radar_id, radius_km, radar_x_radar_dist):
     radius_m = radius_km * 1e3
     if radar_id not in radar_x_radar_dist:
@@ -188,8 +217,8 @@ def Main():
     radar_table = GetNexradTable(radar_base_folder=radar_base_folder, radar_folder_table=radar_folder_table,
                                  save_table=True, force_collection=False)
     radar_x_radar = RadarXRadarDistance(radar_table, radar_base_folder, to_save=True, force_update=False)
-    print(radar_x_radar['KTLX'][:10])
-    tmp = GetRadarsWithinRadius('KTLX',260,radar_x_radar)
+    print(radar_x_radar['KOHX'][:10])
+    tmp = GetRadarsWithinRadius('KOHX', 200, radar_x_radar)
     print(tmp)
 
 # Main()
