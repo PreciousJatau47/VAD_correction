@@ -137,7 +137,11 @@ def Main():
     log_dir = './atmospheric_model_data/UV_wind_logs'
     log_file_base = '{}_windcomponents_lat_{}_lon_{}.pkl'
 
-    radar_location_kohx = {'latitude': 36.247222900390625, 'longitude': -86.5625, 'height': 205.0}
+    # radar_location_kohx = {'latitude': 36.247222900390625, 'longitude': -86.5625, 'height': 205.0}
+    radar_location_khpx = {'latitude': 36.73697280883789, 'longitude': -87.28558349609375, 'height': 186.0}
+    radar_location_kohx = {'latitude': 34.93055725097656, 'longitude': -86.08361053466797, 'height': 566.0}
+    radar_location_klvx = {'latitude':37.975276947021484, 'longitude': -85.94388580322266, 'height': 253.0}
+    radar_location = radar_location_klvx
 
     # BNA sounding station
     station_lat = 36.25
@@ -146,8 +150,8 @@ def Main():
     if not os.path.isdir(log_dir):
         os.makedirs(log_dir)
 
-    LogRapWindProfileBatch(in_lat=radar_location_kohx['latitude'], in_lon=radar_location_kohx['longitude'],
-                           rap_dir=rap_data_dir, log_dir=log_dir, log_base=log_file_base, show_fig=True,
+    LogRapWindProfileBatch(in_lat=radar_location['latitude'], in_lon=radar_location['longitude'],
+                           rap_dir=rap_data_dir, log_dir=log_dir, log_base=log_file_base, show_fig=False,
                            force_update=False, save_wind_profile=True)
 
     return

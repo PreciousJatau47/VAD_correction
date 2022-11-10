@@ -140,14 +140,15 @@ def AccumulateResults(start_day, stop_day, file_base, log_dir, normalize_counts)
 
             if prev_idx == -1 or idx == prev_idx:
                 idx_count += 1
-            else:   # New bucket encountered.
+            else:  # New bucket encountered.
                 # Calculate average for the past 0.5 hour.
                 echo_counts_batch[VADMask.insects][i][prev_idx] /= idx_count
                 echo_counts_batch[VADMask.birds][i][prev_idx] /= idx_count
                 echo_counts_batch[VADMask.weather][i][prev_idx] /= idx_count
                 idx_count = 1
 
-            echo_total = result[1][VADMask.insects][j] + result[1][VADMask.birds][j] + result[1][VADMask.weather][j] if normalize_counts else 1
+            echo_total = result[1][VADMask.insects][j] + result[1][VADMask.birds][j] + result[1][VADMask.weather][
+                j] if normalize_counts else 1
 
             if math.isnan(echo_counts_batch[VADMask.insects][i][idx]):  # Bucket encountered for the first time.
                 echo_counts_batch[VADMask.insects][i][idx] = result[1][VADMask.insects][j] / echo_total
@@ -171,20 +172,25 @@ def AccumulateResults(start_day, stop_day, file_base, log_dir, normalize_counts)
 
 
 def Main():
-    batch_folder = 'KOHX_20180501_20180515'
+    batch_folder = 'KHTX_20180501_20180531' #'KOHX_20180501_20180515'  # 'KOHX_20180501_20180515'
     log_dir = './analysis_output_logs'
-    radar_name = 'KOHX'
-    file_base = 'KOHX{}{}{}_echo_count.pkl'
+    radar_name = 'KHTX'
+    file_base = 'KHTX{}{}{}_echo_count.pkl'
     month = 5
     year = 2018
     start_day = 1
-    stop_day = 15
+    stop_day = 31
     normalize_counts = True
-    save_fig = False
+    correct_hca_weather = True
+    save_fig = True
     output_figure_dir = './figures'
 
     log_dir = os.path.join(log_dir, batch_folder)
-    output_figure_dir = os.path.join(output_figure_dir, batch_folder, 'summary')
+    log_dir = os.path.join(log_dir, 'hca_weather_corrected') if correct_hca_weather else os.path.join(log_dir,
+                                                                                                      'hca_default')
+    output_figure_dir = os.path.join(output_figure_dir, batch_folder, 'hca_weather_corrected',
+                                     'summary') if correct_hca_weather else os.path.join(output_figure_dir,
+                                                                                         batch_folder, 'summary')
 
     month_num_t_name = GetMonthNumberToName()
 

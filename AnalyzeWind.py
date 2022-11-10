@@ -127,7 +127,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
         plt.savefig(os.path.join(output_folder,
                                  "".join([figure_prefix, "_wind_comparison_components_", figure_suffix, ".png"])),
                     dpi=200)
-    plt.show()
+    # plt.show()
     plt.close()
 
     return
@@ -183,8 +183,6 @@ def InterpolateWindComponents(windU, windV, height_grid, height_grid_interp, max
 """
 Interpolate wind U and V components from sounding and rap 130.
 """
-
-
 def InterpolateSoundingWind(sounding_df, height_grid_interp, max_height_diff, max_height):
     height_grid = sounding_df['HGHT']
     windU = sounding_df['windU']
@@ -294,7 +292,7 @@ def PrepareAnalyzeWindInputs(radar_data_file, batch_folder, radar_data_folder, h
         return radar_data_file, radar_data_folder, None, None, None
 
 
-def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, station_infos, sounding_log_dir,
+def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, sounding_log_dir,
                 norm_stats_file, clf_file, vad_jobs, figure_dir, max_range=300, max_height_VAD=1000,
                 match_radar_and_sounding_grid=True, save_wind_figure=False, radar=None, hca_vol=None, data_table=None,
                 l3_filelist=None, vad_debug_params=None, ground_truth_source=WindSource.sounding, rap_folder=None,
@@ -309,7 +307,10 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     print("Correct hca weather: \t {}".format(correct_hca_weather))
 
     # Sounding.
-    station_id = station_infos[radar_t_sounding[radar_name]][0]
+    # TODO(pjatau). station_id is a string for station number. Obtain directly from radar_x_sounding table.
+    # station_id = station_infos[radar_t_sounding[radar_name]][0]
+    station_id = str(radar_t_sounding[radar_name][0][0])
+
     sounding_url_base = "http://weather.uwyo.edu/cgi-bin/sounding?region=naconf&TYPE=TEXT%3ALIST&YEAR={}&MONTH={}&FROM={}&TO={}&STNM={}"
 
     gt_desc = GetWindSourceDescription(ground_truth_source)
@@ -334,7 +335,9 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                                                                      station_id, sounding_log_dir,
                                                                      showDebugPlot=False, log_sounding_data=True,
                                                                      force_website_download=False)
-        gt_loc_desc = station_infos[radar_t_sounding[radar_name]][1]
+        # TODO(pjatau) use more intuitive(relevant) description for ground truth.
+        # gt_loc_desc = station_infos[radar_t_sounding[radar_name]][1]
+        gt_loc_desc = str(radar_t_sounding[radar_name][0][0])
         if gt_wind_df is None:
             print("Sounding data is not available for this scan. Aborting wind analysis ...")
             return None, None, None
@@ -415,13 +418,13 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
         if not X.empty:
             data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file, norm_stats_path=norm_stats_file)
 
-    bi_counter = Counter(data_table['BIClass'])
-    total = data_table.shape[0]
+    # bi_counter = Counter(data_table['BIClass'])
+    # total = data_table.shape[0]
     # for count_key in bi_counter:
     #     bi_counter[count_key] /= total
 
-    print("BIClass distribution")
-    print(bi_counter)
+    # print("BIClass distribution")
+    # print(bi_counter)
 
     # Visualize data table.
     # color_map = GetDataTableColorMap()

@@ -22,7 +22,7 @@ def classify_echoes(X, clf_path, norm_stats_path=None):
 
     # Normalize X for bi.
     X_bi = X - norm_stats['mean']
-    X_bi = X.div(norm_stats['standard deviation'], axis=1)
+    X_bi = X_bi.div(norm_stats['standard deviation'], axis=1)
     X_bi = np.array(X_bi)
     y_bi = bi_clf['model'].predict(X_bi)
 

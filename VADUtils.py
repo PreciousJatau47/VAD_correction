@@ -68,7 +68,7 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description):
         ax[1].set_ylabel("Bin count")
 
         plt.suptitle(description)
-        plt.show()
+        # plt.show()
     return wind_speed, wind_dir, optimized_signal
 
 
@@ -152,7 +152,8 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
                                     columns=["wind_speed", "wind_direction", "wind_U", "wind_V", "height",
                                              "num_samples","mean_ref"])
 
-    if showDebugPlot:
+    tmp = False
+    if tmp:    # TODO remove or define proper flag.
         plt.figure()
         plt.plot(wind_profile_vad['wind_U'], wind_profile_vad['height'], color='blue', label="windU")
         plt.plot(wind_profile_vad['wind_V'], wind_profile_vad['height'], color='red', label="windV")

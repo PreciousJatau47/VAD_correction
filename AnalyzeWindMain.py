@@ -2,22 +2,27 @@ import os
 import warnings
 from VADMaskEnum import VADMask
 from AnalyzeWind import *
-
+from RadarXSoundingUtils import RadarXSoundingDistance
 
 def Main():
-    # Radar/Sounding.
-    radar_data_file = 'KOHX20180501_042926_V06.ar2v'  # "KENX20180424_120113_V06.ar2v"  # "KENX20180410_124739_V06.ar2v"  # "KENX20180502_053506_V06.ar2v" #
+    # Radar/wind source.
+    radar_data_file = 'KLVX20180503_090349_V06.ar2v' #'KHTX20180501_110357_V06.ar2v' #'KHPX20180515_200448_V06.ar2v' #'KOHX20180503_180336_V06.ar2v' #'KOHX20180501_042926_V06.ar2v'  # "KENX20180424_120113_V06.ar2v"  # "KENX20180410_124739_V06.ar2v"  # "KENX20180502_053506_V06.ar2v" #
     radar_data_folder = "./radar_data"
-    batch_folder = "KOHX_20180501_20180515"  # "KOHX_20180501_20180515"  # "KENX_20180401_20180430"  # "KENX_20180501_20180531" #"KOHX_20180601_20180630"
+    batch_folder =  "KLVX_20180501_20180531" #"KHPX_20180501_20180531" #"KOHX_20180501_20180515"  # "KOHX_20180501_20180515"  # "KENX_20180401_20180430"  # "KENX_20180501_20180531" #"KOHX_20180601_20180630"
     hca_data_folder = "./level3_data"
-    radar_t_sounding = {'KHTX': 'BNA', 'KTLX': 'LMN', 'KOHX': 'BNA', 'KENX': 'ALB'}
+    # TODO(pjatau) delete below radar_t_sounding.
+    # radar_t_sounding = {'KHTX': 'BNA', 'KTLX': 'LMN', 'KOHX': 'BNA', 'KENX': 'ALB', 'KHPX':'BNA'}
+    radar_t_sounding = RadarXSoundingDistance(nexrad_table=None, sounding_table=None, output_folder="./radar_data")
+    print(radar_t_sounding['KOHX'])
+    # TODO(pjatau) Delete station infos.
     station_infos = {'LMN': ('74646', 'Lamont, Oklahoma'), 'BNA': ('72327', 'Nashville, Tennessee'),
                      'ALB': ('72518', 'Albany, New York')}
     sounding_log_dir = "./sounding_logs"
     is_batch = True
+    gt_wind_source = WindSource.sounding
 
     # RAP
-    rap_folder = r"./atmospheric_model_data/rap_130_20180501_20180515"
+    rap_folder = r"./atmospheric_model_data/rap_130_20180501_20180531"
 
     # Model.
     norm_stats_file = "./models/ridge_bi/mean_std_for_normalization_2.pkl"
@@ -44,12 +49,12 @@ def Main():
                                                                                                   biw_clf_file=biw_clf_file)
 
     vad_profiles, sounding_df, echo_dist = AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder,
-                                                       radar_t_sounding, station_infos, sounding_log_dir,
+                                                       radar_t_sounding, sounding_log_dir,
                                                        norm_stats_file, clf_file, vad_jobs, figure_dir=figure_dir,
                                                        match_radar_and_sounding_grid=True,
                                                        save_wind_figure=False, vad_debug_params=vad_debug_params,
                                                        radar=radar_obj, hca_vol=hca_vol, data_table=data_table,
-                                                       l3_filelist=None, ground_truth_source=WindSource.sounding,
+                                                       l3_filelist=None, ground_truth_source=gt_wind_source,
                                                        rap_folder=rap_folder, correct_hca_weather=correct_hca_weather,
                                                        biw_norm_stats_file=biw_norm_stats_file,
                                                        biw_clf_file=biw_clf_file)

@@ -6,239 +6,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from TrueWindEnum import *
 from NexradUtils import GetTimeHourUTC
+from AirspeedAnalysisUtils import *
 
 font = {'family': 'DejaVu Sans',
         'weight': 'bold',
         'size': 11}
 plt.rc('font', **font)
-
-
-def WindError(x1, y1, x2, y2, error_fn, reduce_fn):
-    mapper = {}
-    for j in range(len(x2)):
-        mapper[x2[j]] = j
-
-    x_scores = x1
-    scores = []
-    for i in range(len(x1)):
-        if x1[i] in mapper.keys():
-            ind = mapper[x1[i]]
-            error = error_fn(y1[i], y2[ind])
-            scores.append(error)
-        else:
-            scores.append(np.nan)
-
-    reduced_error = reduce_fn(scores)
-    return reduced_error, scores, x_scores
-
-
-def GetAirSpeedForScan(wind_file, wind_files_parent, error_fn, reduce_fn, debug_plots=False, figure_dir=None,
-                       save_plots=True, ground_truth_wind_source=WindSource.sounding):
-    def GetAirSpeeds(delta_U, delta_V):
-        airspeeds = []
-        for i in range(len(delta_U)):
-            airspeeds.append(np.sqrt(delta_U[i] ** 2 + delta_V[i] ** 2))
-        return airspeeds
-
-    wind_source_desc = GetWindSourceDescription(ground_truth_wind_source)
-    wind_source_desc = wind_source_desc.replace(' ', '_')
-
-    wind_file_no_ext = os.path.splitext(wind_file)[0]
-
-    figure_dir = os.path.join(figure_dir, wind_file_no_ext[:12], 'airspeed', wind_source_desc)
-    if not os.path.isdir(figure_dir):
-        os.makedirs(figure_dir)
-
-    with open(os.path.join(wind_files_parent, wind_file), 'rb') as w_in:
-        wind_result = pickle.load(w_in)
-    w_in.close()
-
-    vad = wind_result['VAD']
-    sounding_df = wind_result['Sounding']
-    echo_dist = wind_result['echo_dist']
-
-    if sounding_df is None:
-        return None
-
-    # Sounding.
-    x_sound = np.array(sounding_df['HGHT'])
-    y_sound_U = np.array(sounding_df['windU'])
-    y_sound_V = np.array(sounding_df['windV'])
-
-    # Birds.
-    x_birds = np.array(vad[VADMask.birds]['height'])
-    y_birds_U = np.array(vad[VADMask.birds]['wind_U'])
-    y_birds_V = np.array(vad[VADMask.birds]['wind_V'])
-
-    # Insects
-    x_insects = np.array(vad[VADMask.insects]['height'])
-    y_insects_U = np.array(vad[VADMask.insects]['wind_U'])
-    y_insects_V = np.array(vad[VADMask.insects]['wind_V'])
-
-    # Sounding v bird
-    err_sound_birds_U, scores_sound_birds_U, x_sound_birds_U = WindError(x_sound, y_sound_U, x_birds, y_birds_U,
-                                                                         error_fn, reduce_fn)
-    err_sound_birds_V, scores_sound_birds_V, x_sound_birds_V = WindError(x_sound, y_sound_V, x_birds, y_birds_V,
-                                                                         error_fn, reduce_fn)
-    airspeed_birds = GetAirSpeeds(scores_sound_birds_U, scores_sound_birds_V)
-
-    # Sounding v insects
-    err_sound_insects_U, scores_sound_insects_U, x_sound_insects_U = WindError(x_sound, y_sound_U, x_insects,
-                                                                               y_insects_U, error_fn, reduce_fn)
-    err_sound_insects_V, scores_sound_insects_V, x_sound_insects_V = WindError(x_sound, y_sound_V, x_insects,
-                                                                               y_insects_V, error_fn, reduce_fn)
-    airspeed_insects = GetAirSpeeds(scores_sound_insects_U, scores_sound_insects_V)
-
-    if debug_plots or save_plots:
-        plt.figure()
-        plt.scatter(airspeed_birds, x_sound_birds_U, color="blue", alpha=0.4)
-        plt.plot(airspeed_birds, x_sound_birds_U, color="blue", label="birds")
-        plt.scatter(airspeed_insects, x_sound_insects_U, color="red", alpha=0.4)
-        plt.plot(airspeed_insects, x_sound_insects_U, color="red", label="insects")
-        plt.xlim(0, 12)
-        plt.ylim(0, 900)
-        plt.grid(True)
-        plt.xlabel("flight speed [m/s]")
-        plt.ylabel("height [m]")
-        plt.title(wind_file_no_ext)
-        plt.legend()
-        if save_plots:
-            plt.savefig(os.path.join(figure_dir, "".join([wind_file_no_ext, '.png'])))
-        # if debug_plots:
-        #     plt.show()
-        plt.close()
-
-    return pd.DataFrame({'file_name': wind_file_no_ext, 'airspeed_birds': airspeed_birds,
-                         'airspeed_insects': airspeed_insects, 'height_m': x_sound_insects_U,
-                         'prop_birds': echo_dist['bird'],
-                         'prop_insects': echo_dist['insects'],
-                         'prop_weather': echo_dist['weather']})
-
-
-def GetAirSpeedBatch(wind_files_parent, error_fn, reduce_fn, figure_dir, debug_plots, save_plots=False,
-                     ground_truth_wind_source=WindSource.sounding):
-    wind_files = os.listdir(wind_files_parent)
-    wind_error_df = pd.DataFrame(
-        columns=['file_name', 'airspeed_birds', 'airspeed_insects', 'height_m', 'prop_birds', 'prop_insects',
-                 'prop_weather'])
-
-    # Get wind here.
-    for wind_file in wind_files:
-        entry = GetAirSpeedForScan(wind_file, wind_files_parent, error_fn, reduce_fn, debug_plots=debug_plots,
-                                   save_plots=save_plots, figure_dir=figure_dir,
-                                   ground_truth_wind_source=ground_truth_wind_source)
-        if entry is not None:
-            wind_error_df = wind_error_df.append(entry, ignore_index=True)
-    return wind_error_df
-
-
-def GetAirSpeedManyBatches(wind_dir, batch_folders, experiment_id, echo_count_dir, log_dir, figure_dir,
-                           plot_title_suffix, out_name_suffix, save_plots=False, force_airspeed_analysis=False,
-                           ground_truth_source=WindSource.sounding, debug_airspeed_plots=False,
-                           save_airspeed_plots=False, correct_hca_weather=False):
-    wind_source_desc = GetWindSourceDescription(ground_truth_source)
-    wind_source_desc = wind_source_desc.replace(' ', '_')
-
-    echo_count_batch_folders = []
-    for folder in batch_folders:
-        echo_count_batch_folders.append(folder[:22])
-
-    error_fn = lambda yTrue, yPred: np.abs(yPred - yTrue)
-    reduce_fn = lambda scores: np.nanmean(scores)
-
-    if not os.path.isdir(log_dir):
-        os.makedirs(log_dir)
-
-    # Get airspeed for scans in batch.
-    log_output_name = "_".join(batch_folders) + "_" + wind_source_desc + ".pkl"
-
-    if correct_hca_weather:
-        log_files_parent = os.path.join(log_dir, 'hca_weather_corrected')
-    else:
-        log_files_parent = os.path.join(log_dir, 'hca_default')
-
-    if not os.path.isdir(log_files_parent):
-        os.makedirs(log_files_parent)
-    log_output_path = os.path.join(log_files_parent, log_output_name)
-
-    if force_airspeed_analysis or not os.path.isfile(log_output_path):
-        if len(batch_folders) == 1:
-            figure_dir_batch = os.path.join(figure_dir, batch_folders[0])
-            wind_folder = os.path.join(wind_dir, batch_folders[0], 'hca_weather_corrected',
-                                       wind_source_desc) if correct_hca_weather else os.path.join(wind_dir,
-                                                                                                  batch_folders[0],
-                                                                                                  'hca_default',
-                                                                                                  wind_source_desc)
-            wind_error = GetAirSpeedBatch(wind_folder, error_fn,
-                                          reduce_fn,
-                                          figure_dir=figure_dir_batch, debug_plots=debug_airspeed_plots,
-                                          save_plots=save_airspeed_plots,
-                                          ground_truth_wind_source=ground_truth_source)
-        else:
-            df_list = []
-            for batch_folder in batch_folders:
-                figure_dir_batch = os.path.join(figure_dir, batch_folder)
-                wind_folder = os.path.join(wind_dir, batch_folder, 'hca_weather_corrected',
-                                           wind_source_desc) if correct_hca_weather else os.path.join(wind_dir,
-                                                                                                      batch_folder,
-                                                                                                      'hca_default',
-                                                                                                      wind_source_desc)
-                print(wind_folder)
-                df_list.append(
-                    GetAirSpeedBatch(wind_folder, error_fn, reduce_fn,
-                                     figure_dir=figure_dir_batch, debug_plots=debug_airspeed_plots,
-                                     save_plots=save_airspeed_plots,
-                                     ground_truth_wind_source=ground_truth_source))
-            wind_error = pd.concat(df_list, ignore_index=True)
-            del df_list
-
-        # Sort airspeeds by insect proportion.
-        bird_ratio_bio = wind_error['prop_birds']
-        insects_ratio_bio = wind_error['prop_insects']
-        total = bird_ratio_bio + insects_ratio_bio
-        insects_ratio_bio = np.divide(insects_ratio_bio, total)
-        wind_error['insect_prop_bio'] = insects_ratio_bio * 100
-        wind_error = wind_error.sort_values(by=['insect_prop_bio'])
-
-        # Get overall weather proportion
-        wind_error["prop_weather_scan"] = ""
-
-        echo_counts = {}
-        for batch_folder in echo_count_batch_folders:
-            echo_count_batch_path = os.path.join(echo_count_dir, batch_folder,
-                                                 'hca_weather_corrected') if correct_hca_weather else os.path.join(
-                echo_count_dir,
-                batch_folder, 'hca_default')
-            for file in os.listdir(echo_count_batch_path):
-                key = file.split('_')[0]
-                with open(os.path.join(echo_count_batch_path, file), 'rb') as pin_echo:
-                    echo_counts[key] = pickle.load(pin_echo)
-                    pin_echo.close()
-
-        unique_scans_wind = np.unique(wind_error['file_name'])
-        for curr_scan_wind in unique_scans_wind:
-            scans_list, echo_dist = echo_counts[curr_scan_wind.split("_")[0]]
-            radar_ext = os.path.splitext(scans_list[0])[1]
-
-            curr_scan_radar = "".join([curr_scan_wind[:-5], radar_ext])
-            idx_scan_radar = [i for i in range(len(scans_list)) if scans_list[i].endswith(curr_scan_radar)][0]
-
-            n_birds = echo_dist[VADMask.birds][idx_scan_radar]
-            n_insects = echo_dist[VADMask.insects][idx_scan_radar]
-            n_weather = echo_dist[VADMask.weather][idx_scan_radar]
-
-            wind_error.loc[wind_error['file_name'] == curr_scan_wind, "prop_weather_scan"] = n_weather * 100 / (
-                    n_birds + n_insects + n_weather)
-
-        with open(log_output_path, "wb") as p_out:
-            pickle.dump(wind_error, p_out)
-        p_out.close()
-    else:
-        pin = open(log_output_path, 'rb')
-        wind_error = pickle.load(pin)
-        pin.close()
-
-    return wind_error
 
 
 def ImposeConstraints(df, constraints, idx=True):
@@ -484,7 +257,21 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
             os.path.join(figure_summary_dir, "".join(["mean_airspeed_v_insect_prop_", out_name_suffix, ".png"])),
             dpi=200)
 
+
+    # Plot 7: average insect flight speed at bird flight speed
+    # TODO(pjatau) Maybe also group by height
+    delta_airspeed = 0.5
+    averaged_at_insect_airspeed =  wind_error[["insect_prop_bio", "airspeed_birds", "airspeed_insects", "height_m"]]
+    averaged_at_insect_airspeed['height_bins'] = averaged_at_insect_airspeed['height_m'] // 350
+    averaged_at_insect_airspeed['airspeed_insects_bin'] = averaged_at_insect_airspeed['airspeed_insects'] // delta_airspeed * delta_airspeed + delta_airspeed
+    averaged_at_insect_airspeed = averaged_at_insect_airspeed.groupby(['airspeed_insects_bin', 'height_bins'], as_index = False).mean()
+
+    plt.figure()
+    plt.scatter(averaged_at_insect_airspeed['airspeed_insects'], averaged_at_insect_airspeed['airspeed_birds'])
+    plt.plot([0, max_airspeed], [0, max_airspeed], linestyle='dashed', alpha=0.6)
+
     plt.show()
+    print()
 
 
 # TODO
@@ -499,11 +286,10 @@ def Main():
     wind_dir = './vad_sounding_comparison_logs'
     # batch_folders = ["KOHX_20180501_20180515", "KOHX_20180516_20180531"]
     # batch_folders = ["KOHX_20180501_20180515"]
-    batch_folders = ["KOHX_20180501_20180515",
-                     "KOHX_20180516_20180531"]
+    batch_folders = ["KOHX_20180503_test_data"] #["KOHX_20180501_20180515", "KOHX_20180516_20180531"]
     # batch_folders = ["KOHX_20180501_20180515_2hr_window",
     #                  "KOHX_20180516_20180531_2hr_window"]
-    experiment_id = "KOHX_20180501_20180531"  # "KENX_20180501_20180531_2hr_window"
+    experiment_id = "khtx"  # "KENX_20180501_20180531_2hr_window"
     correct_hca_weather = True
 
     echo_count_dir = './analysis_output_logs'
@@ -512,22 +298,39 @@ def Main():
     figure_dir = "./figures"
     plot_title_suffix = "May 1 - 31, 2018"
     out_name_suffix = "May_1_31_2018"
-    save_plots = False
+    save_plots = True
     force_airspeed_analysis = False
 
+    airspeed_log_dir = r'.\batch_analysis_logs'
+    # airspeed_files = ['KOHX_20180501_20180515_launched_20221030_21\KOHX_20180501_20180515.pkl',
+    #                   'KOHX_20180516_20180531_launched_2022112_12\KOHX_20180516_20180531.pkl']
+    airspeed_files = ['KHTX_20180501_20180531_launched_2022114_17/KHTX_20180501_20180531.pkl']
+
     MAX_WEATHER_PROP = 10  # 10
-    MAX_WEATHER_PROP_SCAN = 10 #10  # 20 #15  # 20
+    MAX_WEATHER_PROP_SCAN = 5 #10  # 20 #15  # 20
 
     gt_wind_source = WindSource.rap_130
     wind_source_desc = GetWindSourceDescription(gt_wind_source)
     wind_source_desc = wind_source_desc.replace(' ', '_')
 
     # Get flight speeds of birds and insects
-    wind_error = GetAirSpeedManyBatches(wind_dir, batch_folders, experiment_id, echo_count_dir, log_dir, figure_dir,
-                                        plot_title_suffix, out_name_suffix, save_plots=save_plots,
-                                        force_airspeed_analysis=force_airspeed_analysis,
-                                        ground_truth_source=gt_wind_source, save_airspeed_plots=False,
-                                        correct_hca_weather=correct_hca_weather)
+    # wind_error = GetAirSpeedManyBatches(wind_dir, batch_folders, experiment_id, echo_count_dir, log_dir, figure_dir,
+    #                                     plot_title_suffix, out_name_suffix, save_plots=save_plots,
+    #                                     force_airspeed_analysis=force_airspeed_analysis,
+    #                                     ground_truth_source=gt_wind_source, save_airspeed_plots=False,
+    #                                     correct_hca_weather=correct_hca_weather)
+
+    # TODO(pjatau) Refactor whole function. This is throw-away code
+    # wind_error_path = r".\batch_analysis_logs\KOHX_20180501_20180515_launched_20221023_20\KOHX_20180501_20180515.pkl"
+
+    wind_error = pd.DataFrame()
+    for airspeed_file in airspeed_files:
+        wind_error_path = os.path.join(airspeed_log_dir, airspeed_file)
+        p_in = open(wind_error_path, 'rb')
+        curr_wind_error, idx_last_log = pickle.load(p_in)
+        p_in.close()
+        wind_error = wind_error.append(curr_wind_error)
+
 
     # Filter wind error data.
     remove_cases_list = []
