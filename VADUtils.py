@@ -1,12 +1,15 @@
 import numpy as np
 import random
 import math
+import pickle
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import least_squares, minimize
 from VADMaskEnum import *
+from WindUtils import Polar2CartesianComponentsDf, Cartesian2PolarComponentsDf
 
 MIN_FRACTION_SAMPLES_REQUIRED = 1.5
+
 
 def GetVADMask(data_table, echo_type):
     if echo_type == VADMask.biological:
@@ -53,9 +56,10 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description):
 
     wind_speed = abs(wind_cost_func(wind_dir_pred.x[0]))
     wind_dir = wind_dir_pred.x[0] % 360
-    # print("estimated wind speed :", wind_speed, "mps.\nDirection: ", wind_dir, " degrees.")
 
     if showDebugPlot:
+        print("estimated wind speed :", wind_speed, "mps.\nDirection: ", wind_dir, " degrees.")
+
         fig, ax = plt.subplots(1,2, figsize = (8.0,6.4))
         ax[0].plot(pred_var, resp_var, label="data", color="blue")
         ax[0].plot(pred_var, optimized_signal, label="VAD fit", color="red", alpha=1.0)
@@ -68,7 +72,7 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description):
         ax[1].set_ylabel("Bin count")
 
         plt.suptitle(description)
-        # plt.show()
+        plt.show()
     return wind_speed, wind_dir, optimized_signal
 
 
@@ -144,9 +148,18 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
         if not vad_valid:
             wind_speed, wind_dir, fitted_points = np.nan, np.nan, None
 
+        # TODO(pjatau) EM
         wind_U = wind_speed * np.sin(wind_dir * np.pi / 180)
         wind_V = wind_speed * np.cos(wind_dir * np.pi / 180)
-        wind_profile_vad.append([wind_speed, wind_dir, wind_U, wind_V, height_vad, len(velocity_cut), mean_ref])
+
+        windU, windV = Polar2CartesianComponentsDf(wind_speed, wind_dir)
+
+        # TODO(pjatau) EM
+        if np.isfinite(wind_U):
+            assert round(wind_U,2) == round(windU,2)
+            assert round(wind_V,2) == round(windV,2)
+
+        wind_profile_vad.append([wind_speed, wind_dir, windU, windV, height_vad, len(velocity_cut), mean_ref])
 
     wind_profile_vad = pd.DataFrame(wind_profile_vad,
                                     columns=["wind_speed", "wind_direction", "wind_U", "wind_V", "height",
@@ -175,10 +188,12 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
 
     return wind_profile_vad
 
+
 def Main():
-    showDebugPlot = False
-    N = 360
-    t = np.arange(0, N)
+    showDebugPlot = True
+    N = 720 * round(MIN_FRACTION_SAMPLES_REQUIRED)
+    # t = np.arange(0, 360)
+    t = np.linspace(0, 360, N)
 
     x = [random.uniform(0, 20), random.uniform(0, 2 * np.pi)]
     true_wind_speed = x[0]
@@ -188,6 +203,7 @@ def Main():
     signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])
     data = signal_func(x, t) + random.uniform(0, 2) * np.random.randn(N)
 
-    wind_speed, wind_dir, vad_fit = fitVAD(t, data, signal_func, showDebugPlot)
+    wind_speed, wind_dir, vad_fit = fitVAD(t, data, signal_func, showDebugPlot, description='')
 
 # Main()
+# TestVADUtils()

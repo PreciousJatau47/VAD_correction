@@ -12,6 +12,12 @@ from NexradUtils import *
 from RadarXSoundingUtils import RadarXSoundingDistance
 from AirspeedAnalysisUtils import GetAirSpeedScan, UpdateWindError
 
+font = {'family': 'DejaVu Sans',
+        'weight': 'bold',
+        'size': 15}
+plt.rc('font', **font)
+
+
 def AccumulateOrAverageSelector(prev_scan_time, radar_scan_time, delta_time):
     # Decide between accumulate and average.
     if prev_scan_time < 0:
@@ -22,7 +28,10 @@ def AccumulateOrAverageSelector(prev_scan_time, radar_scan_time, delta_time):
         to_accumm = prev_time_partition == radar_time_partition
     return to_accumm
 
+
 "TODO(pjatau) Add documentation."
+
+
 def AccumulateAndAverage(to_accumm, radar_file, files_accumm, vad_profiles, vad_profiles_accumm, averaged_profiles,
                          height_bin_size):
     if to_accumm:
@@ -51,6 +60,7 @@ def AccumulateAndAverage(to_accumm, radar_file, files_accumm, vad_profiles, vad_
         return vad_profiles_accumm, averaged_profiles, [""]
 
     return vad_profiles_accumm, averaged_profiles, [files_accumm[(len(files_accumm) - 1) // 2]]
+
 
 def TestAccumulateAndAverage():
     radar_files = ['0001/KOHX20180503_181320_V06.ar2v', '0001/KOHX20180503_182320_V06.ar2v',
@@ -87,12 +97,12 @@ def TestAccumulateAndAverage():
             to_accumm = prev_time_partition == radar_time_partition
 
         vad_profiles_accumm, averaged_profiles, mid_file_log = AccumulateAndAverage(to_accumm=to_accumm,
-                                                                                radar_file=radar_file,
-                                                                                files_accumm=files_accumm,
-                                                                                vad_profiles=vad_profiles,
-                                                                                vad_profiles_accumm=vad_profiles_accumm,
-                                                                                averaged_profiles=averaged_profiles,
-                                                                                height_bin_size=height_bin_size)
+                                                                                    radar_file=radar_file,
+                                                                                    files_accumm=files_accumm,
+                                                                                    vad_profiles=vad_profiles,
+                                                                                    vad_profiles_accumm=vad_profiles_accumm,
+                                                                                    averaged_profiles=averaged_profiles,
+                                                                                    height_bin_size=height_bin_size)
         if not to_accumm:
             # Test for middle radar file
             assert mid_file_log[
@@ -125,6 +135,7 @@ def TestAccumulateAndAverage():
 
         prev_scan_time = radar_scan_time
 
+
 # def TempMain():
 #     TestAccumulateAndAverage()
 #
@@ -136,7 +147,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                     force_output_logging,
                     ground_truth_source=WindSource.sounding,
                     rap_folder=None, correct_hca_weather=False, biw_norm_stats_file=None,
-                    biw_clf_file=None, log_dir='./', experiment_name = ''):
+                    biw_clf_file=None, log_dir='./', experiment_name='', allowed_el_hca = None):
     # Echo count options
     echo_count_log_dir = os.path.join(echo_count_log_dir, batch_folder)
     if correct_hca_weather:
@@ -191,7 +202,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
     # TODO(pjatau) move out, maybe to function parameters.
     # Airspeed averaging options
     height_bin_size = 40
-    delta_time = 1 #0.5
+    delta_time = 1  # 0.5
 
     sounding_df = None
     echo_dist_VAD = None
@@ -208,15 +219,18 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
 
     first_day = days[0]
     for idx_days in range(idx_days_last_log, len(days)):
+        # for idx_days in range(12, 12+1): # TODO(pjatau) erase me
         curr_day = days[idx_days]
         print("Processing ", curr_day, " ........")
         radar_scans = radar_scans_day[curr_day]  # ~200 scans
-        wind_error_df = pd.DataFrame(
-            columns=['file_name', 'airspeed_birds', 'airspeed_insects', 'height_m', 'prop_birds', 'prop_insects',
-                     'prop_weather', 'prop_weather_scan', 'insect_prop_bio'])
-        wind_error_averaged_df = pd.DataFrame(
-            columns=['file_name', 'airspeed_birds', 'airspeed_insects', 'height_m', 'prop_birds', 'prop_insects',
-                     'prop_weather', 'prop_weather_scan', 'insect_prop_bio'])
+        # wind_error_df = pd.DataFrame(
+        #     columns=['file_name', 'airspeed_birds', 'airspeed_insects', 'height_m', 'num_insects_height',
+        #              'num_birds_height',
+        #              'prop_birds', 'prop_insects',
+        #              'prop_weather', 'prop_weather_scan', 'insect_prop_bio', "radar", "year", "month", "day",
+        #              "time_hour"])
+        wind_error_df = pd.DataFrame()
+        wind_error_averaged_df = wind_error_df.copy()
 
         # Initialize bird, insect and weather count
         bird_count_scan = []
@@ -241,7 +255,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                               correct_hca_weather=correct_hca_weather,
                                                               max_height_VAD=1000,
                                                               biw_norm_stats_file=biw_norm_stats_file,
-                                                              biw_clf_file=biw_clf_file)
+                                                              biw_clf_file=biw_clf_file, allowed_el_hca=allowed_el_hca)
 
             # Echo distribution.
             if data_table is None:
@@ -279,6 +293,9 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                 # VisualizeDataTable(data_table=data_table, color_map=color_map, output_folder=scan_figure_dir,
                 #                    scan_name=scan_name, title_suffix=title_suffix, combine_plots=True,
                 #                    correct_hca_weather=correct_hca_weather)
+                # VisualizeDataTable(data_table=data_table, color_map=color_map, output_folder=scan_figure_dir,
+                #                    scan_name=scan_name, title_suffix=title_suffix, combine_plots=False,
+                #                    correct_hca_weather=False)
 
             if is_near_sounding or ground_truth_source == WindSource.rap_130:
 
@@ -333,7 +350,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                                                                 height_bin_size=height_bin_size)
 
                     if not to_accumm:  # averaged scan available.
-                        wind_error_averaged_df = UpdateWindError(wind_error_averaged_df, mid_file_log[0], averaged_profiles,
+                        wind_error_averaged_df = UpdateWindError(wind_error_averaged_df, mid_file_log[0],
+                                                                 averaged_profiles,
                                                                  sounding_df,
                                                                  echo_dist_VAD, error_fn,
                                                                  reduce_fn,
@@ -344,15 +362,17 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                     prev_scan_time = radar_scan_time
 
                     # Get airspeeds for current scan and update wind error.
-                    wind_error_df = UpdateWindError(wind_error_df, target_file, vad_profiles, sounding_df, echo_dist_VAD, error_fn,
-                                    reduce_fn,
-                                    ground_truth_source, figure_dir, batch_folder, n_birds, n_insects, n_weather)
+                    wind_error_df = UpdateWindError(wind_error_df, target_file, vad_profiles, sounding_df,
+                                                    echo_dist_VAD, error_fn,
+                                                    reduce_fn,
+                                                    ground_truth_source, figure_dir, batch_folder, n_birds, n_insects,
+                                                    n_weather)
 
                     # Save output from AnalyzeWind.
                     with open(vad_sounding_path, 'wb') as p_out:
                         pickle.dump({'VAD': vad_profiles, 'Sounding': sounding_df, 'echo_dist': echo_dist_VAD}, p_out)
                     p_out.close()
-                else: # radar_obj is None
+                else:  # radar_obj is None
                     target_folder = os.path.split(radar_subpath)
                     target_file = target_folder[1]
 
@@ -404,7 +424,6 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                  ground_truth_source, figure_dir, batch_folder, n_birds,
                                                  n_insects, n_weather)
 
-
         echo_count_scan = {VADMask.birds: bird_count_scan, VADMask.insects: insect_count_scan,
                            VADMask.weather: weather_count_scan}
         result = (radar_scans, echo_count_scan)
@@ -419,7 +438,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
         # Save wind error everyday.
         # TODO(pjatau) define a proper experiment name
         log_path = os.path.join(experiment_dir, ''.join([batch_folder, '.pkl']))
-        log_path_averaged = os.path.join(experiment_dir, ''.join([batch_folder,'_averaged_',str(delta_time), '.pkl']))
+        log_path_averaged = os.path.join(experiment_dir, ''.join([batch_folder, '_averaged_', str(delta_time), '.pkl']))
 
         # Save(update) wind error results on a daily basis
         if curr_day == first_day:  # First data set to be logged
@@ -635,9 +654,9 @@ def GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_da
                 title_suffix = "{}% birds, {}% insects, {}% weather.".format(prop_birds, prop_insects, prop_weather)
 
                 # 16s per plot item.
-                # VisualizeDataTable(data_table=data_table, color_map=color_map, output_folder=scan_figure_dir,
-                #                    scan_name=scan_name, title_suffix=title_suffix, combine_plots=True,
-                #                    correct_hca_weather=correct_hca_weather)
+                VisualizeDataTable(data_table=data_table, color_map=color_map, output_folder=scan_figure_dir,
+                                   scan_name=scan_name, title_suffix=title_suffix, combine_plots=True,
+                                   correct_hca_weather=correct_hca_weather)
 
         echo_count_scan = {VADMask.birds: bird_count_scan, VADMask.insects: insect_count_scan,
                            VADMask.weather: weather_count_scan}
@@ -655,19 +674,19 @@ def GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_da
 TODO
 Enforce format for batch_folder. 
 """
-
 def Main():
     level3_folder = "./level3_data"
     radar_folder = "./radar_data"
+    allowed_el_hca = {0.5: "N0H", 1.5: "N1H", 2.5: "N2H", 3.5: "N3H"}
     force_output_logging = True
     output_log_dir = "./analysis_output_logs"
     figure_dir = './figures'
     save_ppi_plots = True
 
-    batch_folder = 'KHTX_20180501_20180531' #"KOHX_20180516_20180531" #"KOHX_20180501_20180515"# "KOHX_20180503_test_data"  # "KOHX_20180516_20180531"
+    batch_folder = "KOHX_20180503_test_data" #"KOHX_20180501_20180515" #"KOHX_20180516_20180531" # 'KLVX_20180501_20180531' #'KHTX_20180501_20180531' #"KOHX_20180516_20180531" #  # "KOHX_20180516_20180531"
     # date_pattern = "*KENX201804{}*_V06.*"
-    start_day = 1
-    stop_day = 31
+    start_day = 3
+    stop_day = 3
     max_range = 400  # in km.
     max_height_VAD = 1000  # in m.
 
@@ -722,6 +741,7 @@ def Main():
                     ground_truth_source=ground_truth_wind, rap_folder=rap_folder,
                     correct_hca_weather=correct_hca_weather,
                     biw_norm_stats_file=biw_norm_stats_file, biw_clf_file=biw_clf_file, log_dir=e2e_analysis_log_dir,
-                    experiment_name='KHTX_20180501_20180531_launched_2022114_17')
+                    experiment_name='', allowed_el_hca=allowed_el_hca)
+
 
 Main()

@@ -172,13 +172,13 @@ def AccumulateResults(start_day, stop_day, file_base, log_dir, normalize_counts)
 
 
 def Main():
-    batch_folder = 'KHTX_20180501_20180531' #'KOHX_20180501_20180515'  # 'KOHX_20180501_20180515'
+    batch_folder = 'KOHX_20180516_20180531' #'KHTX_20180501_20180531' #'KOHX_20180501_20180515'  # 'KOHX_20180501_20180515'
     log_dir = './analysis_output_logs'
-    radar_name = 'KHTX'
-    file_base = 'KHTX{}{}{}_echo_count.pkl'
+    radar_name = 'KOHX'
+    file_base = 'KOHX{}{}{}_echo_count.pkl'
     month = 5
     year = 2018
-    start_day = 1
+    start_day = 16
     stop_day = 31
     normalize_counts = True
     correct_hca_weather = True

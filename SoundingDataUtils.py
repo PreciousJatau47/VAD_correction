@@ -6,6 +6,7 @@ import urllib.request
 import numpy as np
 import matplotlib.pyplot as plt
 from HaverSineDistance import GetHaverSineDistance
+from WindUtils import Cartesian2PolarComponentsDf, Polar2CartesianComponentsDf
 import Station
 
 KNOT_T_MPS = 0.514444
@@ -174,9 +175,11 @@ def GetSoundingWind(sounding_url_base, radar_data_file, radar_location, station_
     sounding_data_df['DRCT'] = (sounding_data_df['DRCT'] + 180) % 360
 
     # Get U and V components of the wind.
-    sounding_data_df['windU'] = sounding_data_df['SMPS'] * np.sin(sounding_data_df['DRCT'] * np.pi / 180)
-    sounding_data_df['windV'] = sounding_data_df['SMPS'] * np.cos(sounding_data_df['DRCT'] * np.pi / 180)
-    print(sounding_data_df.columns)
+    # sounding_data_df['windU'] = sounding_data_df['SMPS'] * np.sin(sounding_data_df['DRCT'] * np.pi / 180)
+    # sounding_data_df['windV'] = sounding_data_df['SMPS'] * np.cos(sounding_data_df['DRCT'] * np.pi / 180)
+    windU, windV = Polar2CartesianComponentsDf(sounding_data_df['SMPS'], sounding_data_df['DRCT'])
+    sounding_data_df['windU'] = windU
+    sounding_data_df['windV'] = windV
 
     # Save sounding data.
     if log_sounding_data:

@@ -7,6 +7,7 @@ from NexradUtils import *
 from VADMaskEnum import VADMask
 from TrueWindEnum import *
 from VADUtils import VADWindProfile
+import GeneralUtils as gu
 from collections import Counter
 
 font = {'family': 'DejaVu Sans',
@@ -82,53 +83,63 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     plt.close(fig)
 
     # Plot for U and V wind components.
-    plt.figure()
+    fig_comp, ax_comp = plt.subplots()
+    ax_comp_sec = ax_comp.twinx()
 
     # Mean reflectivity vs height.
     wind_profile_vad = vad_profiles_job[VADMask.insects]
     vad_height_idx = wind_profile_vad['height'] < max_height
-    plt.plot(wind_profile_vad['mean_ref'][vad_height_idx], wind_profile_vad['height'][vad_height_idx], color='black',
-             label="ref")
+    ax_comp.plot(wind_profile_vad['mean_ref'][vad_height_idx], wind_profile_vad['height'][vad_height_idx], color='black',
+             label="Z")
 
     for job_id in vad_profiles_job.keys():
         wind_profile_vad = vad_profiles_job[job_id]
         vad_height_idx = wind_profile_vad['height'] < max_height
 
         # Radar wind components.
-        plt.scatter(wind_profile_vad['wind_U'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
+        ax_comp.scatter(wind_profile_vad['wind_U'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
                     color=blue_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.35)
-        plt.plot(wind_profile_vad['wind_U'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
+        ax_comp.plot(wind_profile_vad['wind_U'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
                  color=blue_color_wheel[job_id], alpha=0.8, label=description_jobs[job_id][0] + " vad_U")
-        plt.scatter(wind_profile_vad['wind_V'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
+        ax_comp.scatter(wind_profile_vad['wind_V'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
                     color=red_color_wheel[job_id], marker=description_jobs[job_id][1], alpha=0.35)
-        plt.plot(wind_profile_vad['wind_V'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
+        ax_comp.plot(wind_profile_vad['wind_V'][vad_height_idx], wind_profile_vad['height'][vad_height_idx],
                  color=red_color_wheel[job_id], alpha=0.8, label=description_jobs[job_id][0] + " vad_V")
 
     # Sounding wind components.
     sounding_height_idx = sounding_wind_df['HGHT'] < max_height
-    plt.scatter(sounding_wind_df['windU'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
+    ax_comp.scatter(sounding_wind_df['windU'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
                 marker='o', color="blue", alpha=0.1)
-    plt.scatter(sounding_wind_df['windV'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
+    ax_comp.scatter(sounding_wind_df['windV'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
                 color="red", alpha=0.1)
-    plt.plot(sounding_wind_df['windU'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
+    ax_comp.plot(sounding_wind_df['windU'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
              label="wind_U", color="blue", linestyle='dashed')
-    plt.plot(sounding_wind_df['windV'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
+    ax_comp.plot(sounding_wind_df['windV'][sounding_height_idx], sounding_wind_df['HGHT'][sounding_height_idx],
              label="wind_V", color="red", linestyle='dashed')
 
-    plt.ylim(0, 1.4 * max_height)
-    plt.xlim(-16, 23)
-    plt.grid(True)
-    plt.xlabel("Wind components [mps]")
-    plt.ylabel("Height [m]")
-    plt.title(title_str + '\n' + prop_str)
-    plt.legend(ncol=3)
+    # ax_comp.set_ylim(0, 1.4 * max_height)
+    ax_comp.set_ylim(0, 1.2 * max_height)
+    # ax_comp.set_xlim(-16, 23)
+    ax_comp.set_xlim(-2, 20)
+    ax_comp.grid(True)
+    ax_comp.set_xlabel("Wind components [mps]")
+    ax_comp.set_ylabel("Height [m]")
+    # ax_comp_sec.set_ylim(0, 1.4 * max_height)
+    ax_comp_sec.set_ylim(0, 1.2 * max_height)
+    # ax_comp_sec.set_xlim(-16, 23)
+    ax_comp_sec.set_xlim(-2, 20)
+    ax_comp_sec.set_ylabel("Height [m]")
+
+    ax_comp.set_title(title_str + '\n' + prop_str)
+    ax_comp.legend(loc = 'upper center', ncol=3, fontsize = 10.5)
     plt.tight_layout()
     if save_plots:
         plt.savefig(os.path.join(output_folder,
                                  "".join([figure_prefix, "_wind_comparison_components_", figure_suffix, ".png"])),
                     dpi=200)
     # plt.show()
-    plt.close()
+    plt.close(fig_comp)
+    plt.close('all')
 
     return
 
@@ -210,7 +221,19 @@ def InterpolateSoundingWind(sounding_df, height_grid_interp, max_height_diff, ma
     remnant_variables = set(sounding_df.columns) - set(df_interp.columns)
     for remnant_var in remnant_variables:
         df_interp[remnant_var] = np.nan
-        df_interp[remnant_var][idx_height_interp] = sounding_df[remnant_var][idx_height]
+        tmp = sounding_df.loc[idx_height, remnant_var]
+        tmp.reset_index(drop=True, inplace=True)
+        df_interp.loc[idx_height_interp, remnant_var] = tmp
+
+    spd_interp, dirn_interp = Cartesian2PolarComponentsDf(u=df_interp["windU"], v=df_interp["windV"])
+    idx_finite_smps = np.isfinite(df_interp['SMPS'])
+    idx_infinite_smps = np.logical_not(idx_finite_smps)
+    df_interp.loc[idx_infinite_smps, "SMPS"] = spd_interp[idx_infinite_smps]
+    df_interp.loc[idx_infinite_smps, "DRCT"] = dirn_interp[idx_infinite_smps]
+
+    # TODO(pjatau) remove this after a few runs
+    assert round(df_interp['SMPS']).equals(round(spd_interp))
+    assert round(df_interp['DRCT']).equals(round(dirn_interp))
 
     df_interp = df_interp.sort_values(by=['HGHT'])
 
@@ -239,14 +262,21 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
     df_interp = pd.DataFrame(
         {'height': height_grid_interp, 'wind_U': windU_interp, 'wind_V': windV_interp})
 
-    df_interp['wind_speed'] = np.nan
+    spd_interp, dirn_interp = Cartesian2PolarComponentsDf(u=df_interp["wind_U"], v=df_interp["wind_V"])
+
+    df_interp['wind_speed'] = spd_interp
     df_interp.loc[range(len(vad_df)), 'wind_speed'] = vad_df['wind_speed']
-    df_interp['wind_direction'] = np.nan
+    df_interp['wind_direction'] = dirn_interp
     df_interp.loc[range(len(vad_df)), 'wind_direction'] = vad_df['wind_direction']
     df_interp['num_samples'] = np.nan
     df_interp.loc[range(len(vad_df)), 'num_samples'] = vad_df['num_samples']
     df_interp['mean_ref'] = np.nan
     df_interp.loc[range(len(vad_df)), 'mean_ref'] = vad_df['mean_ref']
+
+    # TODO(pjatau) remove this after a few runs
+    assert round(df_interp['wind_speed']).equals(round(spd_interp))
+    assert round(df_interp['wind_direction']).equals(round(dirn_interp))
+
     df_interp = df_interp.sort_values(by=['height'])
 
     return df_interp
@@ -254,7 +284,7 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
 
 def PrepareAnalyzeWindInputs(radar_data_file, batch_folder, radar_data_folder, hca_data_folder, clf_file, is_batch,
                              norm_stats_file=None, correct_hca_weather=False, biw_norm_stats_file=None,
-                             biw_clf_file=None):
+                             biw_clf_file=None, allowed_el_hca = None):
     if is_batch:
         start_day = int(radar_data_file[10:12])
         stop_day = start_day
@@ -281,7 +311,7 @@ def PrepareAnalyzeWindInputs(radar_data_file, batch_folder, radar_data_folder, h
                                                           clf_file=clf_file, norm_stats_file=norm_stats_file,
                                                           correct_hca_weather=correct_hca_weather,
                                                           max_height_VAD=1000, biw_norm_stats_file=biw_norm_stats_file,
-                                                          biw_clf_file=biw_clf_file)
+                                                          biw_clf_file=biw_clf_file, allowed_el_hca=allowed_el_hca)
 
         target_folder = os.path.split(radar_subpath)
         radar_data_file = target_folder[1]
@@ -298,7 +328,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                 l3_filelist=None, vad_debug_params=None, ground_truth_source=WindSource.sounding, rap_folder=None,
                 log_dir_rap='./atmospheric_model_data/UV_wind_logs',
                 log_file_base_rap='{}_windcomponents_lat_{}_lon_{}.pkl', correct_hca_weather=True,
-                biw_norm_stats_file=None, biw_clf_file=None):
+                biw_norm_stats_file=None, biw_clf_file=None, allowed_el_hca = None):
     radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
     radar_name, year, month, day, hh, mm, ss = read_info_from_radar_name(radar_data_file)
 
@@ -307,8 +337,6 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     print("Correct hca weather: \t {}".format(correct_hca_weather))
 
     # Sounding.
-    # TODO(pjatau). station_id is a string for station number. Obtain directly from radar_x_sounding table.
-    # station_id = station_infos[radar_t_sounding[radar_name]][0]
     station_id = str(radar_t_sounding[radar_name][0][0])
 
     sounding_url_base = "http://weather.uwyo.edu/cgi-bin/sounding?region=naconf&TYPE=TEXT%3ALIST&YEAR={}&MONTH={}&FROM={}&TO={}&STNM={}"
@@ -335,6 +363,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                                                                      station_id, sounding_log_dir,
                                                                      showDebugPlot=False, log_sounding_data=True,
                                                                      force_website_download=False)
+
         # TODO(pjatau) use more intuitive(relevant) description for ground truth.
         # gt_loc_desc = station_infos[radar_t_sounding[radar_name]][1]
         gt_loc_desc = str(radar_t_sounding[radar_name][0][0])
@@ -350,6 +379,11 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                                                                         log_file_base_rap, show_fig=False,
                                                                         force_update=False,
                                                                         save_wind_profile=True)
+        # TODO(pjatau) move magnitude/direction calculation into GetRapWindProfileRelativeToRadar
+        spd_rap, dirn_rap = Cartesian2PolarComponentsDf(u=gt_wind_df["windU"], v=gt_wind_df["windV"])
+        gt_wind_df['SMPS'] = spd_rap
+        gt_wind_df['DRCT'] = dirn_rap
+
         gt_wind_ddhh = ''.join([day, hh])
         gt_loc_desc = "Lat {}{}, Lon {}{}".format(round(location_radar['latitude'], 2), '$^{\circ}$',
                                                   round(location_radar['longitude'], 2),
@@ -371,9 +405,9 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
 
     if hca_vol is None:
         if l3_filelist is None:
-            hca_vol = GetHcaVol(hca_data_folder, radar_data_file_no_ext)
+            hca_vol = GetHcaVol(hca_data_folder, radar_data_file_no_ext, allowed_el_hca)
         else:
-            hca_vol = GetHcaVolFromFileList(hca_data_folder, radar_data_file_no_ext, l3_filelist)
+            hca_vol = GetHcaVolFromFileList(hca_data_folder, radar_data_file_no_ext, l3_filelist, allowed_el_hca)
 
     # Data table.
     if data_table is None:
@@ -418,18 +452,6 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
         if not X.empty:
             data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file, norm_stats_path=norm_stats_file)
 
-    # bi_counter = Counter(data_table['BIClass'])
-    # total = data_table.shape[0]
-    # for count_key in bi_counter:
-    #     bi_counter[count_key] /= total
-
-    # print("BIClass distribution")
-    # print(bi_counter)
-
-    # Visualize data table.
-    # color_map = GetDataTableColorMap()
-    # VisualizeDataTable(data_table, color_map, figure_dir, scan_name=radar_data_file, title_suffix="",
-    #                    combine_plots=True, correct_hca_weather=correct_hca_weather)
 
     # VAD wind profile
     signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])

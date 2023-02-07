@@ -65,7 +65,7 @@ def GetFileListRadar(batch_folder_path, start_day, stop_day, date_pattern):
 
 def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l3, l3_files_dic, max_range,
                      height_binsize=0.04, clf_file=None, norm_stats_file=None, correct_hca_weather=False,
-                     max_height_VAD=1000, biw_norm_stats_file=None, biw_clf_file=None):
+                     max_height_VAD=1000, biw_norm_stats_file=None, biw_clf_file=None, allowed_el_hca = None):
     # Read radar volume.
     try:
         print("Opening ", os.path.join(batch_folder_path_radar, radar_subpath))
@@ -76,8 +76,11 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
 
     # Read HCA volume.
     radar_filename = os.path.splitext(os.path.split(radar_subpath)[1])[0]
+    if allowed_el_hca is None:
+        sys.exit("allowed_el_hca is None. Specify the elevations to process.")
+
     try:
-        hca_vol = GetHcaVolFromFileList(batch_folder_path_l3, radar_filename, l3_files_dic)
+        hca_vol = GetHcaVolFromFileList(batch_folder_path_l3, radar_filename, l3_files_dic, allowed_el_hca)
     except:
         print('Read failed for expected l3 file. Might not exist or might be corrupted. Skipping to next iteration.')
         return None, None, None

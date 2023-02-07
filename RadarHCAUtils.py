@@ -9,7 +9,7 @@ from PreciousFunctions import PreciousCmap
 
 font = {'family': 'DejaVu Sans',
         'weight': 'bold',
-        'size': 10}
+        'size': 15}
 plt.rc('font', **font)
 
 
@@ -45,18 +45,6 @@ def GetHcaPathFromFileList(hca_day_folder, radar_file, hca_el, el_desc_hca, file
         return target_folder
     return None  # file not found.
 
-
-def GetHcaVolFromFileList(hca_day_folder, radar_file, filelist):
-    el_desc_hca = {0.5: "N0H", 1.5: "N1H", 2.5: "N2H", 3.5: "N3H"}
-    volume_hca = {}
-    for el_hca in el_desc_hca.keys():
-        print(GetHcaPathFromFileList(hca_day_folder, radar_file, el_hca, el_desc_hca, filelist))
-        volume_hca[el_hca] = pyart.io.read_nexrad_level3(
-            GetHcaPathFromFileList(hca_day_folder, radar_file, el_hca, el_desc_hca, filelist))
-    print(volume_hca[el_hca].fields['radar_echo_classification']['options'])
-    return volume_hca
-
-
 def GetHcaPath(hca_day_folder, radar_file, hca_el, el_desc_hca):
     suffix = "".join(["SDUS84_", el_desc_hca[hca_el], "{}_{}{}{}{}"])
     hca_subfolder = el_desc_hca[hca_el]
@@ -74,13 +62,20 @@ def GetHcaPath(hca_day_folder, radar_file, hca_el, el_desc_hca):
             return os.path.join(target_folder, hca_file)
     return None  # file not found.
 
+def GetHcaVolFromFileList(hca_day_folder, radar_file, filelist, el_desc_hca):
+    # el_desc_hca = {0.5: "N0H", 1.5: "N1H", 2.5: "N2H", 3.5: "N3H"}
+    volume_hca = {}
+    for el_hca in el_desc_hca.keys():
+        volume_hca[el_hca] = pyart.io.read_nexrad_level3(
+            GetHcaPathFromFileList(hca_day_folder, radar_file, el_hca, el_desc_hca, filelist))
+    return volume_hca
 
-def GetHcaVol(hca_day_folder, radar_file):
-    el_desc_hca = {0.5: "N0H", 1.5: "N1H", 2.5: "N2H", 3.5: "N3H"}
+
+def GetHcaVol(hca_day_folder, radar_file, el_desc_hca):
+    # el_desc_hca = {0.5: "N0H", 1.5: "N1H", 2.5: "N2H", 3.5: "N3H"}
     volume_hca = {}
     for el_hca in el_desc_hca.keys():
         volume_hca[el_hca] = pyart.io.read_nexrad_level3(GetHcaPath(hca_day_folder, radar_file, el_hca, el_desc_hca))
-    print(volume_hca[el_hca].fields['radar_echo_classification']['options'])
     return volume_hca
 
 
@@ -188,17 +183,30 @@ def VisualizeDataTable(data_table, color_map, output_folder, scan_name=None, tit
         if not os.path.isdir(product_folder):
             os.makedirs(product_folder)
 
-        if scan_name:
-            output_path = os.path.join(product_folder, ''.join([scan_name, '_', '.png']))
+        plot_folder = product_folder
+        plot_scan_name = scan_name
+
+        if combine_plots:
+            if scan_name:
+                output_path = os.path.join(plot_folder, ''.join([scan_name, '_', '.png']))
+            else:
+                output_path = plot_folder + "\\" + product + ".png"
         else:
-            output_path = product_folder + "\\" + product + ".png"
+            plot_folder = os.path.join(plot_folder, 'individual_cuts')
+            if not os.path.isdir(plot_folder):
+                os.makedirs(plot_folder)
+
+            if scan_name:
+                output_path_base = os.path.join(plot_folder, ''.join([scan_name, '_{}', '.png']))
+            else:
+                output_path_base = plot_folder + "\\" + product + "_{}.png"
 
         if combine_plots:
             fig, ax = plt.subplots(2, 2, sharex=True, sharey=True)
             count_subplot = 0
-        else:
-            # TODO handle individual plots.
-            sys.exit("VisualizeDataTable: No definition for individual plots.")
+        # else:
+        #     # TODO handle individual plots.
+        #     sys.exit("VisualizeDataTable: No definition for individual plots.")
 
         for curr_el in elevation_slices:
             x = np.multiply(range_grid * np.cos(curr_el * np.pi / 180), np.sin(az_grid * np.pi / 180))
@@ -216,6 +224,26 @@ def VisualizeDataTable(data_table, color_map, output_folder, scan_name=None, tit
                                                                       vmax=color_map[product][1][1])
                 ax[count_subplot // 2, count_subplot % 2].set_title(str(curr_el) + "$^{\circ}$.")
                 count_subplot += 1
+            else:
+                curr_el_str = str(curr_el)
+                curr_el_str = curr_el_str.replace('.','p')
+                output_path = output_path_base.format(curr_el_str)
+
+                fig, ax = plt.subplots()
+                cax = ax.pcolor(x, y, data_grid, cmap=color_map[product][0], vmin=color_map[product][1][0],
+                           vmax=color_map[product][1][1])
+                ax.set_xlim(-270, 270)
+                ax.set_ylim(-270, 270)
+                ax.set_xticks((-200, -100, 0, 100, 200))
+                ax.set_yticks((-200, -100, 0, 100, 200))
+                ax.set_xlabel('X [km]')
+                ax.set_ylabel('Y [km]')
+                ax.set_title(title_str + " \n Elevation: " + str(curr_el) + "$^{\circ}$")
+                cbar = fig.colorbar(cax)
+                plt.tight_layout()
+                plt.savefig(output_path, dpi=200)
+                # plt.show()
+                plt.close()
 
         if combine_plots:
             fig.add_subplot(111, frameon=False)
@@ -231,9 +259,9 @@ def VisualizeDataTable(data_table, color_map, output_folder, scan_name=None, tit
             fig.subplots_adjust(top=0.84)
             cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
             fig.colorbar(im, cax=cbar_ax)
-            # plt.show()
-        plt.savefig(output_path, dpi=200)
-        plt.close(fig)
+            plt.show()
+            plt.savefig(output_path, dpi=200)
+            plt.close(fig)
     return
 
 
