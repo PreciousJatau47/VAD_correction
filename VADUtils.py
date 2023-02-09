@@ -164,6 +164,7 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
     wind_profile_vad = pd.DataFrame(wind_profile_vad,
                                     columns=["wind_speed", "wind_direction", "wind_U", "wind_V", "height",
                                              "num_samples","mean_ref"])
+    wind_profile_vad = wind_profile_vad.drop_duplicates(subset='height', keep='last', ignore_index=True)
 
     tmp = False
     if tmp:    # TODO remove or define proper flag.

@@ -32,20 +32,28 @@ def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist):
     vel_profiles.rename(columns = {"HGHT":"height_m", "DRCT":"wind_direction","SMPS": "wind_speed"}, inplace=True)
     wind_file_no_ext = os.path.splitext(wind_file)[0]
     vel_profiles['file_name'] = wind_file_no_ext
+    vel_profiles = vel_profiles.drop_duplicates(subset='height_m', keep='last')
 
     # VAD
-    vad_vel_cols = ["height", "wind_speed", "wind_direction", "num_samples"]
+    vad_vel_cols_base = ["height", "wind_speed", "wind_direction", "num_samples"]
     new_cols_base = ["height_m", "{}_speed", "{}_direction", "num_{}_height"]
 
     for echo in vad:
         if echo == VADMask.weather:
             continue
 
-        echo_df = vad[echo].loc[:, vad_vel_cols]
+        vad_vel_cols = vad_vel_cols_base.copy()
         new_cols = new_cols_base.copy()
         new_cols = [new_cols[i] if i < 1 else new_cols[i].format(GetVADMaskDescription(echo)) for i in
                     range(len(new_cols))]
+
+        if echo == VADMask.biological:
+            vad_vel_cols.insert(1, 'mean_ref')
+            new_cols.insert(1, '_'.join(['mean_ref', GetVADMaskDescription(echo)]))
+
+        echo_df = vad[echo].loc[:, vad_vel_cols]
         echo_df.rename(columns = dict(zip(vad_vel_cols, new_cols)), inplace=True)
+        echo_df = echo_df.drop_duplicates(subset='height_m', keep='last')
 
         vel_profiles = pd.merge(vel_profiles, echo_df, on="height_m", how="outer")
 
