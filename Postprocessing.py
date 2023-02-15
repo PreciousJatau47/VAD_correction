@@ -1,4 +1,5 @@
 import os
+import sys
 import pickle
 import numpy as np
 from VADMaskEnum import VADMask
@@ -7,9 +8,10 @@ from matplotlib import colors
 import pandas as pd
 from TrueWindEnum import *
 from NexradUtils import GetTimeHourUTC
-import sys
+from scipy import stats
 from AirspeedAnalysisUtils import *
 import GeneralUtils as gu
+from WindUtils import *
 from PreciousFunctions import PreciousCmap
 
 
@@ -168,8 +170,9 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         plt.savefig(os.path.join(figure_summary_dir, "".join(
             ["comparison_height_prop_", out_name_suffix, ".png"])), dpi=200)
 
-    # Plot 4. Pure birds vs pure insects.
+    # Plot 4. Pure birds vs pure insects airspeeds.
     impurity_threshold = 30
+    num_bins = 50
     idx_all_birds = wind_error['insect_prop_bio'] < impurity_threshold
     idx_all_insects = wind_error['insect_prop_bio'] > (100 - impurity_threshold)
 
@@ -183,27 +186,116 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
         if np.sum(idx_pure_insects) > 0:
             ax[height_bin].hist(x=wind_error['airspeed_insects'][idx_pure_insects], color='red', label='insects',
-                                alpha=0.3, density=True)
+                                alpha=0.3, density=True, bins=num_bins)
+            print("median airspeed insects: {} mps".format(
+                np.nanmedian(wind_error['airspeed_insects'][idx_pure_insects])))
 
         if np.sum(idx_pure_birds) > 0:
             ax[height_bin].hist(x=wind_error['airspeed_birds'][idx_pure_birds], color='blue', label='birds', alpha=0.3,
-                                density=True)
+                                density=True, bins=num_bins)
+            print("median airspeed birds: {} mps".format(np.nanmedian(wind_error['airspeed_birds'][idx_pure_birds])))
         ax[height_bin].grid(True)
         ax[height_bin].set_title(
-            "Airspeed for single specie scans. {}% impurity. Height, {} - {} m".format(impurity_threshold,
-                                                                                       height_part[height_bin][0],
-                                                                                       height_part[height_bin][1]))
+            "Height, {} - {} m".format(height_part[height_bin][0],
+                                       height_part[height_bin][1]))
         ax[height_bin].legend()
 
     fig.add_subplot(111, frameon=False)
     plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
     plt.xlabel("Airspeed (m/s)")
     plt.ylabel("Count (no units)")
+    plt.suptitle("Airspeed for single specie scans. {}% impurity.".format(impurity_threshold))
     plt.tight_layout()
 
     if save_plots:
         plt.savefig(os.path.join(figure_summary_dir, "".join(["single_specie_airspeeds_", out_name_suffix, ".png"])),
                     dpi=200)
+
+    ####################################################################################################################
+    # Plot: Pure bird vs insect migration direction.
+    # TODO(pjatau) Refactor?.
+    fig, ax = plt.subplots(3, 1, figsize=(6.4 * 1.14, 4.8 * 2))
+    for height_bin in range(0, 3):
+        idx_height_part = np.logical_and(wind_error['height_m'] >= height_part[height_bin][0],
+                                         wind_error['height_m'] < height_part[height_bin][1])
+
+        idx_pure_insects = np.logical_and(idx_height_part, idx_all_insects)
+        idx_pure_birds = np.logical_and(idx_height_part, idx_all_birds)
+
+        ax[height_bin].hist(x=wind_error['wind_direction'], color='green', label='wind', alpha=0.6,
+                            density=True, bins=num_bins)
+
+        if np.sum(idx_pure_insects) > 0:
+            ax[height_bin].hist(x=wind_error['insects_direction'][idx_pure_insects], color='red', label='insects',
+                                alpha=0.3, density=True, bins=num_bins)
+
+        if np.sum(idx_pure_birds) > 0:
+            ax[height_bin].hist(x=wind_error['birds_direction'][idx_pure_birds], color='blue', label='birds', alpha=0.3,
+                                density=True, bins=num_bins)
+
+        ax[height_bin].set_xlim(0, 360)
+        ax[height_bin].grid(True)
+        ax[height_bin].set_title(
+            r"Height, {} - {} m".format(
+                height_part[height_bin][0],
+                height_part[height_bin][1]))
+        ax[height_bin].legend()
+
+    fig.add_subplot(111, frameon=False)
+    plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Migration direction ($^\circ$)")
+    plt.ylabel("Count (no units)")
+    plt.suptitle(r"Migration direction $\alpha_r$. {}% impurity".format(impurity_threshold))
+    plt.tight_layout()
+
+    if save_plots:
+        plt.savefig(os.path.join(figure_summary_dir, "".join(["single_specie_mig_dir_", out_name_suffix, ".png"])),
+                    dpi=200)
+    ####################################################################################################################
+
+    ####################################################################################################################
+    # Plot: Pure bird vs insect migration direction offset from the wind.
+    # TODO(pjatau) Refactor?.
+    fig, ax = plt.subplots(3, 1, figsize=(6.4 * 1.14, 4.8 * 2))
+    for height_bin in range(0, 3):
+        idx_height_part = np.logical_and(wind_error['height_m'] >= height_part[height_bin][0],
+                                         wind_error['height_m'] < height_part[height_bin][1])
+
+        idx_pure_insects = np.logical_and(idx_height_part, idx_all_insects)
+        idx_pure_birds = np.logical_and(idx_height_part, idx_all_birds)
+
+        if np.sum(idx_pure_insects) > 0:
+            ax[height_bin].hist(x=wind_error['insects_wind_offset'][idx_pure_insects], color='red', label='insects',
+                                alpha=0.3, density=True, bins=num_bins*3)
+            print("modal offset insects: {} mps".format(
+                stats.mode(round(wind_error['insects_wind_offset'][idx_pure_insects]))))
+
+        if np.sum(idx_pure_birds) > 0:
+            ax[height_bin].hist(x=wind_error['birds_wind_offset'][idx_pure_birds], color='blue', label='birds',
+                                alpha=0.3,
+                                density=True, bins=num_bins*3)
+            print("modal offset birds: {} mps".format(
+                stats.mode(round(wind_error['birds_wind_offset'][idx_pure_birds]))))
+        ax[height_bin].set_xlim(-45, 45)
+        ax[height_bin].grid(True)
+        ax[height_bin].set_title(
+            r"Height, {} - {} m".format(
+                height_part[height_bin][0],
+                height_part[height_bin][1]))
+        ax[height_bin].legend()
+
+    fig.add_subplot(111, frameon=False)
+    plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+    plt.xlabel(r"$\alpha_r - \alpha_w$ ($^\circ$)")
+    plt.suptitle(r"Direction offset $\alpha_r - \alpha_w$. {}% impurity".format(impurity_threshold))
+    plt.tight_layout()
+
+
+    if save_plots:
+        plt.savefig(os.path.join(figure_summary_dir, "".join(["single_specie_offset_mig_dir_", out_name_suffix, ".png"])),
+                    dpi=200)
+    ####################################################################################################################
+
 
     # Plot 5. Histogram of data v insect proportion
     fig, ax = plt.subplots(nrows=len(height_part), ncols=1, figsize=(6.4 * 1.05, 4.8 * 2))
@@ -330,7 +422,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
 
     # Improvement analysis vs insect prop vs height
-    height_ip_df = wind_error[["insect_prop_bio", "airspeed_birds", "airspeed_insects","airspeed_bio", "height_m", "prop_weather_scan"]]
+    height_ip_df = wind_error[["insect_prop_bio", "airspeed_birds", "airspeed_insects","airspeed_biological", "height_m", "prop_weather_scan"]]
     height_ip_df['airspeed_diff'] = height_ip_df['airspeed_birds'] - height_ip_df['airspeed_insects']
     height_ip_df['height_bins'] = height_ip_df['height_m'] // delta_height * delta_height + delta_height / 2
     height_ip_df["insect_prop_bins"] = height_ip_df["insect_prop_bio"] // delta_insect_prop * delta_insect_prop + delta_insect_prop / 2
@@ -383,12 +475,12 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
 
     # Plot of height vs insect prop vs airspeed_bio
-    max_airspeed_bio = np.max(np.abs(height_ip_df['airspeed_bio']))
+    max_airspeed_bio = np.max(np.abs(height_ip_df['airspeed_biological']))
     print("max_airspeed_bio: ", max_airspeed_bio)
 
     unique_height_bins, ins_prop_bins, airspeed_bio_grid = prepare_pcolor_grid_from_series(height_ip_df['height_bins'],
                                                                                    height_ip_df['insect_prop_bins'],
-                                                                                   height_ip_df['airspeed_bio'],
+                                                                                   height_ip_df['airspeed_biological'],
                                                                                    uniqueX=unique_height_bins,
                                                                                    uniqueY=unique_insect_prop_bins)
     fig, ax = plt.subplots()
@@ -402,7 +494,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
     if save_plots:
         plt.savefig(
-            os.path.join(figure_summary_dir, "airspeed_bio_height_insectprop.png"),
+            os.path.join(figure_summary_dir, "airspeed_biological_height_insectprop.png"),
             dpi=200)
 
 
@@ -434,7 +526,9 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     # Plot: insect prop vs time of day vs height
     delta_time_hour = 1
 
-    echo_profile_df = wind_error.loc[:,["month", "day" ,"time_hour", "insect_prop_bio", "height_m", "prop_weather_scan", "num_insects_height", "num_birds_height"]]
+    echo_profile_df = wind_error.loc[:,
+                      ["month", "day", "time_hour", "insect_prop_bio", "height_m", "prop_weather_scan",
+                       "num_insects_height", "num_birds_height", "biological_speed", "biological_direction"]]
     echo_profile_df["height_bins"] = echo_profile_df['height_m'] // delta_height * delta_height + delta_height / 2
     echo_profile_df["time_hour_bins"] = echo_profile_df['time_hour'] // delta_time_hour * delta_time_hour + delta_time_hour /2
 
@@ -485,11 +579,11 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
     # Plot: Averaged insect profile
     height_time_df = echo_profile_df.loc[:,["height_bins", "time_hour_bins", "insect_prop_bio","num_insects_height", "num_birds_height"]]
-    height_time_df = height_time_df.groupby(["height_bins","time_hour_bins"], as_index=False).mean()
+    height_time_grouped = height_time_df.groupby(["height_bins","time_hour_bins"], as_index=False).mean()
     time_hr_bins, unique_height_bins, insect_prop_grid = prepare_pcolor_grid_from_series(
-        height_time_df['time_hour_bins'],
-        height_time_df['height_bins'],
-        height_time_df['insect_prop_bio'], uniqueX=unique_time_hr,
+        height_time_grouped['time_hour_bins'],
+        height_time_grouped['height_bins'],
+        height_time_grouped['insect_prop_bio'], uniqueX=unique_time_hr,
         uniqueY=unique_height_bins)
 
     title_str = "Averaged insect profile relative to biological echoes"
@@ -508,21 +602,60 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
             os.path.join(figure_summary_dir, "averaged_insect_prop_height_timeday.png"),
             dpi=200)
 
-    # Plot: averaged number of birds, insects x height x time
-    max_num = max(np.max(height_time_df["num_insects_height"]),np.max(height_time_df["num_birds_height"]))
-    height_time_df["num_insects_height"] /= max_num
-    height_time_df["num_birds_height"] /= max_num
+    ####################################################################################################################
+    # # Plot. Migration vector (Vr) for one day
+    # # TODO(pjatau) Refactor or em.
+    # curr_day = 1
+    # idx_day = echo_profile_df['day'] == 1
+    # print(np.unique(echo_profile_df['day']))
+    # print(np.sum(idx_day))
+    # print(echo_profile_df.columns)
+    # mig_height_time_df = echo_profile_df.loc[
+    #     idx_day, ["height_bins", "time_hour_bins", "insect_prop_bio", "biological_speed", "biological_direction"]]
+    # mig_height_time_df = mig_height_time_df.groupby(["height_bins","time_hour_bins"], as_index=False).mean() # TODO why is this needed
+    #
+    # mig_height_time_df["birds_U"], mig_height_time_df["birds_V"] = Polar2CartesianComponentsDf(spd=1,
+    #                                                                                            dirn=mig_height_time_df[
+    #                                                                                                "biological_direction"])
+    #
+    # time_hr_bins, unique_height_bins, birds_spd_grid = prepare_pcolor_grid_from_series(
+    #     mig_height_time_df['time_hour_bins'],
+    #     mig_height_time_df['height_bins'],
+    #     mig_height_time_df['biological_speed'], uniqueX=unique_time_hr,
+    #     uniqueY=unique_height_bins)
+    #
+    # fig, ax = plt.subplots()
+    # cax = ax.pcolor(time_hr_bins, unique_height_bins, np.transpose(birds_spd_grid), cmap='jet')
+    # ax.quiver(mig_height_time_df["time_hour_bins"], mig_height_time_df["height_bins"], mig_height_time_df["birds_U"], mig_height_time_df["birds_V"])
+    # cbar = fig.colorbar(cax)
+    # ax.set_xlim(0, 24)
+    # ax.set_ylim(0, 1000)
+    # ax.set_xlabel('Time [UTC]')
+    # ax.set_ylabel('Height [m]')
+    # ax.set_title("biological spd, day {}".format(curr_day))
+    # plt.tight_layout()
+    #
+    # if save_plots:
+    #     plt.savefig(
+    #         os.path.join(figure_summary_dir, "vr.png"),
+    #         dpi=200)
+    ####################################################################################################################
 
-    time_hr_bins, unique_height_bins, num_birds_grid = prepare_pcolor_grid_from_series(height_time_df['time_hour_bins'],
-                                                                                       height_time_df['height_bins'],
-                                                                                       height_time_df[
+    # Plot: averaged number of birds, insects x height x time
+    max_num = max(np.max(height_time_grouped["num_insects_height"]),np.max(height_time_grouped["num_birds_height"]))
+    height_time_grouped["num_insects_height"] /= max_num
+    height_time_grouped["num_birds_height"] /= max_num
+
+    time_hr_bins, unique_height_bins, num_birds_grid = prepare_pcolor_grid_from_series(height_time_grouped['time_hour_bins'],
+                                                                                       height_time_grouped['height_bins'],
+                                                                                       height_time_grouped[
                                                                                            'num_birds_height'],
                                                                                        uniqueX=unique_time_hr,
                                                                                        uniqueY=unique_height_bins)
     time_hr_bins, unique_height_bins, num_insects_grid = prepare_pcolor_grid_from_series(
-        height_time_df['time_hour_bins'],
-        height_time_df['height_bins'],
-        height_time_df['num_insects_height'], uniqueX=unique_time_hr,
+        height_time_grouped['time_hour_bins'],
+        height_time_grouped['height_bins'],
+        height_time_grouped['num_insects_height'], uniqueX=unique_time_hr,
         uniqueY=unique_height_bins)
 
     fig, ax = plt.subplots(1,2, figsize=(6.4*1.5, 4.8))
@@ -553,7 +686,8 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
         population_df = wind_error.loc[:,
                         ["month", "day", "time_hour", "insect_prop_bio", "height_m", "prop_weather_scan",
-                         "num_insects_height", "num_birds_height", "airspeed_bio"]]
+                         "num_insects_height", "num_birds_height", "airspeed_biological", "biological_speed",
+                         "biological_direction"]]
 
         population_df["height_bins"] = population_df['height_m'] // delta_height * delta_height + delta_height / 2
         population_df["time_hour_bins"] = population_df[
@@ -711,7 +845,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
         # Plot for airspeed_bio height profile for whole month.
         unique_time_week, unique_height_bins, weekly_data, xlabels = prepare_weekly_data_for_pcolor_plot(
-            key_col='airspeed_bio',
+            key_col='airspeed_biological',
             x_col_name='time_hour_week',
             y_col_name='height_bins',
             in_data=population_grouped_df,
@@ -747,8 +881,50 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
         if save_plots:
             plt.savefig(
-                os.path.join(figure_summary_dir, "airspeed_bio_height_timeweek.png"),
+                os.path.join(figure_summary_dir, "airspeed_biological_height_timeweek.png"),
                 dpi=200)
+
+        ################################################################################################################
+        # Plot for mig vec height profile for whole month.
+        unique_time_week, unique_height_bins, weekly_data, xlabels = prepare_weekly_data_for_pcolor_plot(
+            key_col='biological_speed',
+            x_col_name='time_hour_week',
+            y_col_name='height_bins',
+            in_data=population_grouped_df,
+            month=month,
+            noon_s_midnight=noon_s_midnight,
+            uniqueX=unique_time_week,
+            uniqueY=unique_height_bins)
+
+        nWeeks = len(weekly_data)
+        fig, ax = plt.subplots(nrows=nWeeks, ncols=1, figsize=(6.4 * 2.95, 4.8 * 2.0))
+        for week in range(nWeeks):
+            if weekly_data[week] is None:
+                continue
+
+            im = ax[week].pcolor(unique_time_week, unique_height_bins, np.transpose(weekly_data[week]), cmap='jet')
+            ax[week].set_xticks(noon_s_midnight)
+            ax[week].set_xticklabels(xlabels[week])
+            ax[week].set_ylim(0, 1000)
+
+            for day_start in day_starts:
+                ax[week].axvline(x=day_start, color='k', linewidth=2, alpha=0.7)
+
+        fig.add_subplot(111, frameon=False)
+        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+        plt.xlabel("Time [UTC]")
+        plt.ylabel("Height [m]")
+        plt.suptitle(r"$\vec{V}_r^bio")
+        plt.tight_layout()
+
+        fig.subplots_adjust(right=0.9)
+        cbar_ax = fig.add_axes([0.93, 0.1, 0.02, 0.8])  # (left, bottom, width, height)
+        fig.colorbar(im, cax=cbar_ax)
+
+        # if save_plots:
+        #     plt.savefig(
+        #         os.path.join(figure_summary_dir, "airspeed_biological_height_timeweek.png"),
+        #         dpi=200)
 
 
     if show_plots:
@@ -776,12 +952,14 @@ def Main():
     figure_dir = "./figures"
     plot_title_suffix = "May 1 - 31, 2018"
     out_name_suffix = "May_1_31_2018"
-    save_plots = True
-    generate_weekly_month_profiles = True
+    save_plots = False
+    generate_weekly_month_profiles = True #False
 
     airspeed_log_dir = r'.\batch_analysis_logs'
-    airspeed_files = ['KOHX_20180501_20180515_launched_2023118_16\KOHX_20180501_20180515.pkl',
-                      'KOHX_20180516_20180531_launched_2023119_10\KOHX_20180516_20180531.pkl']
+    airspeed_files = ['KOHX_20180516_20180531_launched_202329_11/KOHX_20180516_20180531.pkl',
+                      'KOHX_20180501_20180515_launched_202328_19/KOHX_20180501_20180515.pkl']
+    # airspeed_files = ['KOHX_20180501_20180515_launched_2023118_16\KOHX_20180501_20180515.pkl',
+    #                   'KOHX_20180516_20180531_launched_2023119_10\KOHX_20180516_20180531.pkl']
     # airspeed_files = [r'0_to_2pt5_el\KOHX_20180501_20180515_launched_2023121_21\KOHX_20180501_20180515.pkl',
     #                   r'0_to_2pt5_el\KOHX_20180516_20180531_launched_2023122_16\KOHX_20180516_20180531.pkl']
     # airspeed_files = [r'0_to_2pt5_el\KOHX_20180501_20180515_launched_2023121_21\KOHX_20180501_20180515.pkl',
@@ -805,6 +983,28 @@ def Main():
         curr_wind_error, idx_last_log = pickle.load(p_in)
         p_in.close()
         wind_error = wind_error.append(curr_wind_error)
+
+    ## Preprocessing ##
+    # TODO(pjatau) Move target echoes up (?)
+    target_echoes = [VADMask.birds, VADMask.insects, VADMask.biological]
+    if 'airspeed_birds' not in wind_error.columns:
+        for echo in target_echoes:
+            airspeed_fname = 'airspeed_{}'.format(GetVADMaskDescription(echo))
+            fdirn_fname = 'fdirn_{}'.format(GetVADMaskDescription(echo))
+            migspeed_fname = '{}_speed'.format(GetVADMaskDescription(echo))
+            migdirn_fname = '{}_direction'.format(GetVADMaskDescription(echo))
+
+            # Calculate flight vector.
+            wind_error[airspeed_fname], wind_error[fdirn_fname] = CalcPolarDiffVec(
+                spd1=wind_error[migspeed_fname],
+                dirn1=wind_error[migdirn_fname],
+                spd2=wind_error['wind_speed'],
+                dirn2=wind_error[
+                    'wind_direction'])
+
+            # Direction offset from the wind.
+            wind_error['{}_wind_offset'.format(GetVADMaskDescription(echo))] = wind_error['{}_direction'.format(
+                GetVADMaskDescription(echo))] - wind_error['wind_direction']
 
     # Calculate insect-bird height profile.
     if use_ins_height_profile:
@@ -865,10 +1065,8 @@ def Main():
     wind_error_filt = FilterFlightspeeds(wind_error_constrained, constraints)
     # wind_error_filt = wind_error_filt.sort_values(by=['prop_birds'])
     print(np.unique(wind_error_filt.file_name))
-    print()
 
-    # ['KOHX20180501_000411_V06_wind' 'KOHX20180501_135820_V06_wind'
-    #  'KOHX20180501_234533_V06_wind' 'KOHX20180501_235518_V06_wind']
+    return
 
 
 Main()

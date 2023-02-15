@@ -683,10 +683,10 @@ def Main():
     figure_dir = './figures'
     save_ppi_plots = True
 
-    batch_folder = "KOHX_20180503_test_data" #"KOHX_20180501_20180515" #"KOHX_20180516_20180531" # 'KLVX_20180501_20180531' #'KHTX_20180501_20180531' #"KOHX_20180516_20180531" #  # "KOHX_20180516_20180531"
+    batch_folder = "KOHX_20180516_20180531" #"KOHX_20180501_20180515" #"KOHX_20180516_20180531" # 'KLVX_20180501_20180531' #'KHTX_20180501_20180531' #"KOHX_20180516_20180531" #  # "KOHX_20180516_20180531"
     # date_pattern = "*KENX201804{}*_V06.*"
-    start_day = 3
-    stop_day = 3
+    start_day = 16
+    stop_day = 31
     max_range = 400  # in km.
     max_height_VAD = 1000  # in m.
 

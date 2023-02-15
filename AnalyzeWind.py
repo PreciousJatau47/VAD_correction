@@ -80,7 +80,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
         plt.savefig(
             os.path.join(output_folder, "".join([figure_prefix, "_wind_comparison_spherical_", figure_suffix, ".png"])),
             dpi=200)
-    plt.close(fig)
+    # plt.close(fig)
 
     # Plot for U and V wind components.
     fig_comp, ax_comp = plt.subplots()
@@ -137,7 +137,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
         plt.savefig(os.path.join(output_folder,
                                  "".join([figure_prefix, "_wind_comparison_components_", figure_suffix, ".png"])),
                     dpi=200)
-    # plt.show()
+    plt.show()
     plt.close(fig_comp)
     plt.close('all')
 
