@@ -55,7 +55,7 @@ def prepare_pcolor_grid_from_series(x, y, z, uniqueX = None, uniqueY = None):
         uniqueX = np.unique(x)
     if uniqueY is None:
         uniqueY = np.unique(y)
-    zGrid = np.full((len(uniqueX), len(uniqueY)), np.nan)
+    zGrid = {key: np.full((len(uniqueX), len(uniqueY)), np.nan) for key in z}
 
     for ix in range(len(uniqueX)):
         xIdx = x == uniqueX[ix]
@@ -64,13 +64,15 @@ def prepare_pcolor_grid_from_series(x, y, z, uniqueX = None, uniqueY = None):
             idx = gu.logical_and(xIdx, yIdx)
             if np.sum(idx) == 0:
                 continue
-            zGrid[ix][iy] = z[idx]
+
+            for key in z:
+                zGrid[key][ix][iy] = z[key][idx]
 
     return uniqueX, uniqueY, zGrid
 
-def prepare_weekly_data_for_pcolor_plot(key_col, x_col_name, y_col_name, in_data, month, noon_s_midnight, uniqueX = None, uniqueY = None):
+def prepare_weekly_data_for_pcolor_plot(key_cols, x_col_name, y_col_name, in_data, month, noon_s_midnight, uniqueX = None, uniqueY = None):
     assert "week" in in_data.columns, "DataFrame must contain a week column."
-    data_grids = []
+    data_grids = {}
     x_labels = []
 
     for week in range(5):
@@ -80,15 +82,83 @@ def prepare_weekly_data_for_pcolor_plot(key_col, x_col_name, y_col_name, in_data
         week_idx = in_data["week"] == week
         if np.sum(week_idx) <= 0:
             continue
+        # Gather all data for the current week
+        z_dict = {key_col: in_data[key_col][week_idx] for key_col in key_cols}
 
         uniqueX, uniqueY, data_grid = prepare_pcolor_grid_from_series(
-            in_data[x_col_name][week_idx], in_data[y_col_name][week_idx],
-            in_data[key_col][week_idx], uniqueX=uniqueX, uniqueY=uniqueY)
+            x=in_data[x_col_name][week_idx], y=in_data[y_col_name][week_idx],
+            z=z_dict, uniqueX=uniqueX, uniqueY=uniqueY)
 
-        data_grids.append(data_grid)
+        data_grids["week_{}".format(week)] = data_grid
         x_labels.append(x_label)
 
     return uniqueX, uniqueY, data_grids, x_labels
+
+
+def plot_averages_pcolor(x, y, z, cmap, xlab, ylab, title_str, out_dir, out_name, min_z, max_z, xlim=None, ylim=None,
+                         plot_txt=None, save_plot=False):
+
+    fig, ax = plt.subplots()
+    cax = ax.pcolor(x, y, z, vmin=min_z, vmax=max_z,
+                    cmap=cmap)
+    if plot_txt:
+        ax.text(plot_txt[0], plot_txt[1], plot_txt[2])
+    cbar = fig.colorbar(cax)
+    if xlim:
+       ax.set_xlim(xlim)
+    if ylim:
+        ax.set_ylim(ylim)
+    ax.set_xlabel(xlab)
+    ax.set_ylabel(ylab)
+    ax.set_title(title_str)
+
+    if save_plot:
+        plt.savefig(
+            os.path.join(out_dir, out_name),
+            dpi=200)
+    return
+
+
+def plot_weekly_averages(weekly_data, day_starts, noon_s_midnight, xtick_labs, key_col, x, y, cmap, xlab, ylab,
+                         title_str, min_z, max_z, out_dir, out_name, xlim=None, ylim=None, save_plot=False):
+    nWeeks = len(weekly_data)
+    fig, ax = plt.subplots(nrows=nWeeks, ncols=1, figsize=(6.4 * 2.95, 4.8 * 2.0))
+    for week in range(nWeeks):
+        z = weekly_data['week_{}'.format(week)][key_col]
+        if z is None:
+            continue
+
+        im = ax[week].pcolor(x, y, np.transpose(z), cmap=cmap, vmin=min_z, vmax=max_z)
+        ax[week].set_xticks(noon_s_midnight)
+        ax[week].set_xticklabels(xtick_labs[week])
+        if xlim:
+            ax[week].set_xlim(xlim)
+        if ylim:
+            ax[week].set_ylim(ylim)
+
+        for day_start in day_starts:
+            ax[week].axvline(x=day_start, color='k', linewidth=2, alpha=0.7)
+            # if (day_start + 12) > 24*7:
+            #     continue
+            # ax[week].axvline(x=day_start + 12, color='c', linewidth = 2, alpha = 0.7)
+
+    fig.add_subplot(111, frameon=False)
+    plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    plt.suptitle(title_str)
+    plt.tight_layout()
+
+    fig.subplots_adjust(right=0.9)
+    cbar_ax = fig.add_axes([0.93, 0.1, 0.02, 0.8])  # (left, bottom, width, height)
+    fig.colorbar(im, cax=cbar_ax)
+
+    if save_plot:
+        plt.savefig(
+            os.path.join(out_dir, out_name),
+            dpi=200)
+
+    return
 
 
 def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plots, figure_summary_dir,
@@ -421,7 +491,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
             dpi=200)
 
 
-    # Improvement analysis vs insect prop vs height
+    # Height vs insect prop vs data analysis.
     height_ip_df = wind_error[["insect_prop_bio", "airspeed_birds", "airspeed_insects","airspeed_biological", "height_m", "prop_weather_scan"]]
     height_ip_df['airspeed_diff'] = height_ip_df['airspeed_birds'] - height_ip_df['airspeed_insects']
     height_ip_df['height_bins'] = height_ip_df['height_m'] // delta_height * delta_height + delta_height / 2
@@ -431,14 +501,17 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
     unique_insect_prop_bins = np.arange(delta_insect_prop/2, 100, delta_insect_prop)
     unique_height_bins = np.arange(delta_height/2, 1000, delta_height)
+    z_dict = {"airspeed_diff": height_ip_df['airspeed_diff'],
+              'airspeed_biological': height_ip_df['airspeed_biological'],
+              'airspeed_insects': height_ip_df['airspeed_insects']} # monthly averages
 
-    unique_height_bins, ins_prop_bins, diff_grid = prepare_pcolor_grid_from_series(height_ip_df['height_bins'],
+    unique_height_bins, ins_prop_bins, height_ip_grid = prepare_pcolor_grid_from_series(height_ip_df['height_bins'],
                                                                                    height_ip_df['insect_prop_bins'],
-                                                                                   height_ip_df['airspeed_diff'],
+                                                                                   z_dict,
                                                                                    uniqueX=unique_height_bins,
                                                                                    uniqueY=unique_insect_prop_bins)
 
-    # metrics
+    # Plot of height vs insect prop vs airspeed difference
     # TODO(pjatau) maybe move threshold outside function.
     thresholds = (-0.5, 0.5)
     total_valid = np.sum(np.isfinite(height_ip_df['airspeed_diff']))
@@ -458,70 +531,30 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     info_str = ">  {} m/s,  {}%\n<= {} m/s, {}%\nelse {}%".format(thresholds[1], round(pos_diff, 2), thresholds[0],
                                                                round(neg_diff, 2), round(zero_diff, 2))
 
-    fig, ax = plt.subplots()
-    cax = ax.pcolor(ins_prop_bins, unique_height_bins, diff_grid, vmin=-max_amp, vmax=max_amp, cmap='jet')
-    ax.text(55, 800, info_str)
-    cbar = fig.colorbar(cax)
-    ax.set_xlim(0, 100)
-    ax.set_ylim(0, 1000)
-    ax.set_xlabel('insect prop bio [%]')
-    ax.set_ylabel('height [m]')
-    ax.set_title(title_str)
-
-    if save_plots:
-        plt.savefig(
-            os.path.join(figure_summary_dir, "airspeed_difference.png"),
-            dpi=200)
-
+    plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_diff'], cmap='jet',
+                         xlab='insect prop bio [%]', ylab='height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="airspeed_difference.png", min_z=-max_amp,
+                         max_z=max_amp, xlim=(0, 100), ylim=(0, 1000), plot_txt=(55, 800, info_str),
+                         save_plot=save_plots)
 
     # Plot of height vs insect prop vs airspeed_bio
     max_airspeed_bio = np.max(np.abs(height_ip_df['airspeed_biological']))
     print("max_airspeed_bio: ", max_airspeed_bio)
 
-    unique_height_bins, ins_prop_bins, airspeed_bio_grid = prepare_pcolor_grid_from_series(height_ip_df['height_bins'],
-                                                                                   height_ip_df['insect_prop_bins'],
-                                                                                   height_ip_df['airspeed_biological'],
-                                                                                   uniqueX=unique_height_bins,
-                                                                                   uniqueY=unique_insect_prop_bins)
-    fig, ax = plt.subplots()
-    cax = ax.pcolor(ins_prop_bins, unique_height_bins, airspeed_bio_grid, cmap='jet', vmin=0, vmax=max_airspeed_bio)
-    cbar = fig.colorbar(cax)
-    ax.set_xlim(0, 100)
-    ax.set_ylim(0, 1000)
-    ax.set_xlabel('insect prop bio [%]')
-    ax.set_ylabel('height [m]')
-    ax.set_title(r"$airspeed_{bio}$")
-
-    if save_plots:
-        plt.savefig(
-            os.path.join(figure_summary_dir, "airspeed_biological_height_insectprop.png"),
-            dpi=200)
+    plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_biological'], cmap='jet',
+                         xlab='insect prop bio [%]', ylab='height [m]', title_str=r"$airspeed_{bio}$",
+                         out_dir=figure_summary_dir, out_name="airspeed_biological_height_insectprop.png", min_z=0,
+                         max_z=max_airspeed_bio, xlim=(0, 100), ylim=(0, 1000), save_plot=save_plots)
 
 
     # Plot of height vs insect prop vs airspeed_insects
     max_airspeed_ins = np.max(np.abs(height_ip_df['airspeed_insects']))
     print("max_airspeed_ins: ", max_airspeed_ins)
 
-    unique_height_bins, ins_prop_bins, airspeed_ins_grid = prepare_pcolor_grid_from_series(height_ip_df['height_bins'],
-                                                                                   height_ip_df['insect_prop_bins'],
-                                                                                   height_ip_df['airspeed_insects'],
-                                                                                   uniqueX=unique_height_bins,
-                                                                                   uniqueY=unique_insect_prop_bins)
-    fig, ax = plt.subplots()
-    cax = ax.pcolor(ins_prop_bins, unique_height_bins, airspeed_ins_grid, cmap='jet', vmin=0, vmax=max_airspeed_bio)
-    cbar = fig.colorbar(cax)
-    ax.set_xlim(0, 100)
-    ax.set_ylim(0, 1000)
-    ax.set_xlabel('insect prop bio [%]')
-    ax.set_ylabel('height [m]')
-    ax.set_title(r"$airspeed_{insects}$")
-    plt.tight_layout()
-
-    if save_plots:
-        plt.savefig(
-            os.path.join(figure_summary_dir, "airspeed_ins_height_insectprop.png"),
-            dpi=200)
-
+    plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_insects'], cmap='jet',
+                         xlab='insect prop bio [%]', ylab='height [m]', title_str=r"$airspeed_{insects}$",
+                         out_dir=figure_summary_dir, out_name="airspeed_ins_height_insectprop.png", min_z=0,
+                         max_z=max_airspeed_bio, xlim=(0, 100), ylim=(0, 1000), save_plot=save_plots)
 
     # Plot: insect prop vs time of day vs height
     delta_time_hour = 1
@@ -533,29 +566,30 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     echo_profile_df["time_hour_bins"] = echo_profile_df['time_hour'] // delta_time_hour * delta_time_hour + delta_time_hour /2
 
     # Plot: Insect profile per day
-    # day_idx = echo_profile_df["day"] == 1
     ip_day = echo_profile_df[["day", "height_bins", "time_hour_bins", "insect_prop_bio"]]
     ip_day = ip_day.groupby(["day", "height_bins","time_hour_bins"], as_index=False).mean()
 
+    echoProfileDays = [1, 2, 3, 8, 9, 13, 15, 20, 24]
     unique_time_hr = np.arange(delta_time_hour/2, 24, delta_time_hour)
 
     nRows = 3
     nCols = 3
-    fig, ax = plt.subplots(nRows, nCols, figsize=(6.4 *2.8, 4.8*2))
-    echoProfileDays = [1, 2, 3, 8, 9, 13, 15, 20, 24]
+    fig, ax = plt.subplots(nRows, nCols, figsize=(6.4 * 2.8, 4.8 * 2))
 
     for i_day in range(len(echoProfileDays)):
         day = echoProfileDays[i_day]
         day_idx = ip_day["day"] == day
         if np.sum(day_idx) == 0:
             continue
+        z_dict = {"insect_prop_bio": ip_day['insect_prop_bio'][day_idx]}
         time_hr_day, heights_day, insect_prop_day = prepare_pcolor_grid_from_series(ip_day['time_hour_bins'][day_idx],
                                                                                     ip_day['height_bins'][day_idx],
-                                                                                    ip_day['insect_prop_bio'][day_idx],
+                                                                                    z_dict,
                                                                                     uniqueX=unique_time_hr,
                                                                                     uniqueY=unique_height_bins)
         im = ax[int((i_day) // nCols), int((i_day) % nCols)].pcolor(time_hr_day, heights_day,
-                                                                    np.transpose(insect_prop_day), cmap='jet', vmin=0,
+                                                                    np.transpose(insect_prop_day["insect_prop_bio"]),
+                                                                    cmap='jet', vmin=0,
                                                                     vmax=100)
         ax[int((i_day) // nCols), int((i_day) % nCols)].set_xlim(0, 24)
         ax[int((i_day) // nCols), int((i_day) % nCols)].set_ylim(0, 1000)
@@ -577,30 +611,30 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
             os.path.join(figure_summary_dir, "insect_prop_height_timeday.png"),
             dpi=200)
 
-    # Plot: Averaged insect profile
+    # Height vs time of day vs data analysis.
     height_time_df = echo_profile_df.loc[:,["height_bins", "time_hour_bins", "insect_prop_bio","num_insects_height", "num_birds_height"]]
     height_time_grouped = height_time_df.groupby(["height_bins","time_hour_bins"], as_index=False).mean()
-    time_hr_bins, unique_height_bins, insect_prop_grid = prepare_pcolor_grid_from_series(
+
+    max_num = max(np.max(height_time_grouped["num_insects_height"]),np.max(height_time_grouped["num_birds_height"]))
+    height_time_grouped["num_insects_height"] /= max_num
+    height_time_grouped["num_birds_height"] /= max_num
+
+    z_dict = {'insect_prop_bio': height_time_grouped['insect_prop_bio'],
+              'num_birds_height': height_time_grouped['num_birds_height'],
+              'num_insects_height': height_time_grouped['num_insects_height']}
+    time_hr_bins, unique_height_bins, height_time_grid = prepare_pcolor_grid_from_series(
         height_time_grouped['time_hour_bins'],
         height_time_grouped['height_bins'],
-        height_time_grouped['insect_prop_bio'], uniqueX=unique_time_hr,
+        z_dict, uniqueX=unique_time_hr,
         uniqueY=unique_height_bins)
 
+    # Plot: Averaged insect profile
     title_str = "Averaged insect profile relative to biological echoes"
-    fig, ax = plt.subplots()
-    cax = ax.pcolor(time_hr_bins, unique_height_bins, np.transpose(insect_prop_grid), cmap='jet', vmin = 0, vmax = 100)
-    cbar = fig.colorbar(cax)
-    ax.set_xlim(0, 24)
-    ax.set_ylim(0, 1000)
-    ax.set_xlabel('Time [UTC]')
-    ax.set_ylabel('Height [m]')
-    ax.set_title(title_str)
-    plt.tight_layout()
-
-    if save_plots:
-        plt.savefig(
-            os.path.join(figure_summary_dir, "averaged_insect_prop_height_timeday.png"),
-            dpi=200)
+    plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins, z=np.transpose(height_time_grid['insect_prop_bio']),
+                         cmap='jet',
+                         xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="averaged_insect_prop_height_timeday.png", min_z=0,
+                         max_z=100, xlim=(0, 24), ylim=(0, 1000), save_plot=save_plots)
 
     ####################################################################################################################
     # # Plot. Migration vector (Vr) for one day
@@ -641,32 +675,19 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     #         dpi=200)
     ####################################################################################################################
 
+
     # Plot: averaged number of birds, insects x height x time
-    max_num = max(np.max(height_time_grouped["num_insects_height"]),np.max(height_time_grouped["num_birds_height"]))
-    height_time_grouped["num_insects_height"] /= max_num
-    height_time_grouped["num_birds_height"] /= max_num
-
-    time_hr_bins, unique_height_bins, num_birds_grid = prepare_pcolor_grid_from_series(height_time_grouped['time_hour_bins'],
-                                                                                       height_time_grouped['height_bins'],
-                                                                                       height_time_grouped[
-                                                                                           'num_birds_height'],
-                                                                                       uniqueX=unique_time_hr,
-                                                                                       uniqueY=unique_height_bins)
-    time_hr_bins, unique_height_bins, num_insects_grid = prepare_pcolor_grid_from_series(
-        height_time_grouped['time_hour_bins'],
-        height_time_grouped['height_bins'],
-        height_time_grouped['num_insects_height'], uniqueX=unique_time_hr,
-        uniqueY=unique_height_bins)
-
-    fig, ax = plt.subplots(1,2, figsize=(6.4*1.5, 4.8))
-    cax = ax[0].pcolor(time_hr_bins, unique_height_bins, np.transpose(num_birds_grid), cmap='RdYlBu', vmin=0, vmax=1)
+    fig, ax = plt.subplots(1, 2, figsize=(6.4 * 1.5, 4.8))
+    cax = ax[0].pcolor(time_hr_bins, unique_height_bins, np.transpose(height_time_grid['num_birds_height']),
+                       cmap='RdYlBu', vmin=0, vmax=1)
     ax[0].set_xlim(0, 24)
     ax[0].set_ylim(0, 1000)
     ax[0].set_xlabel('Time [UTC]')
     ax[0].set_ylabel('Height [m]')
     ax[0].set_title("num_birds")
 
-    cax = ax[1].pcolor(time_hr_bins, unique_height_bins, np.transpose(num_insects_grid), cmap='RdYlBu', vmin=0, vmax=1)
+    cax = ax[1].pcolor(time_hr_bins, unique_height_bins, np.transpose(height_time_grid['num_insects_height']),
+                       cmap='RdYlBu', vmin=0, vmax=1)
     cbar = fig.colorbar(cax)
     ax[1].set_xlim(0, 24)
     ax[1].set_ylim(0, 1000)
@@ -681,7 +702,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
             dpi=200)
 
 
-    # Plot: number of birds, insects profile for whole month
+    # Plot: weekly profiles for whole month
     if generate_weekly_month_profiles:
 
         population_df = wind_error.loc[:,
@@ -710,9 +731,9 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         unique_time_week = np.arange(0.5, 168, 1)
         unique_height_bins = np.arange(delta_height / 2, 1000, delta_height)
 
-        # Plot for number of bird gates.
         unique_time_week, unique_height_bins, weekly_data, xlabels = prepare_weekly_data_for_pcolor_plot(
-            key_col='num_birds_height',
+            key_cols=['num_birds_height', 'num_insects_height', 'insect_prop_bio', 'airspeed_biological',
+                      'biological_speed'],
             x_col_name='time_hour_week',
             y_col_name='height_bins',
             in_data=population_grouped_df,
@@ -721,188 +742,61 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
             uniqueX=unique_time_week,
             uniqueY=unique_height_bins)
 
-        nWeeks = len(weekly_data)
-        fig, ax = plt.subplots(nrows=nWeeks, ncols=1, figsize=(6.4 * 2.95, 4.8 * 2.0))
-        for week in range(nWeeks):
-            if weekly_data[week] is None:
-                continue
-
-            im = ax[week].pcolor(unique_time_week, unique_height_bins, np.transpose(weekly_data[week]), cmap='RdYlBu',
-                                 vmin=0, vmax=1)
-            ax[week].set_xticks(noon_s_midnight)
-            ax[week].set_xticklabels(xlabels[week])
-            ax[week].set_ylim(0, 1000)
-
-            for day_start in day_starts:
-                ax[week].axvline(x=day_start, color='k', linewidth=2, alpha=0.7)
-                # if (day_start + 12) > 24*7:
-                #     continue
-                # ax[week].axvline(x=day_start + 12, color='c', linewidth = 2, alpha = 0.7)
-
-        fig.add_subplot(111, frameon=False)
-        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
-        plt.xlabel("Time [UTC]")
-        plt.ylabel("Height [m]")
-        plt.suptitle("Number of range gates containing birds")
-        plt.tight_layout()
-
-        fig.subplots_adjust(right=0.9)
-        cbar_ax = fig.add_axes([0.93, 0.1, 0.02, 0.8])  # (left, bottom, width, height)
-        fig.colorbar(im, cax=cbar_ax)
-
-        if save_plots:
-            plt.savefig(
-                os.path.join(figure_summary_dir, "bird_population_height_timeweek.png"),
-                dpi=200)
+        # Plot for number of birds gates
+        title_str = "Number of range gates containing birds"
+        plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
+                             xtick_labs=xlabels,
+                             key_col='num_birds_height', x=unique_time_week, y=unique_height_bins,
+                             min_z=0, max_z=1, xlab="Time [UTC]", ylab="Height [m]", cmap='RdYlBu',
+                             title_str=title_str, out_dir=figure_summary_dir,
+                             out_name="bird_population_height_timeweek.png",
+                             xlim=None,
+                             ylim=(0, 1000), save_plot=save_plots)
 
         # Plot for number of insect gates
-        unique_time_week, unique_height_bins, weekly_data, xlabels = prepare_weekly_data_for_pcolor_plot(
-            key_col='num_insects_height',
-            x_col_name='time_hour_week',
-            y_col_name='height_bins',
-            in_data=population_grouped_df,
-            month=month,
-            noon_s_midnight=noon_s_midnight,
-            uniqueX=unique_time_week,
-            uniqueY=unique_height_bins)
-
-        nWeeks = len(weekly_data)
-        fig, ax = plt.subplots(nrows=nWeeks, ncols=1, figsize=(6.4 * 2.95, 4.8 * 2.0))
-        for week in range(nWeeks):
-            if weekly_data[week] is None:
-                continue
-
-            im = ax[week].pcolor(unique_time_week, unique_height_bins, np.transpose(weekly_data[week]), cmap='RdYlBu',
-                                 vmin=0, vmax=1)
-            ax[week].set_xticks(noon_s_midnight)
-            ax[week].set_xticklabels(xlabels[week])
-            ax[week].set_ylim(0, 1000)
-
-            for day_start in day_starts:
-                ax[week].axvline(x=day_start, color='k', linewidth=2, alpha=0.7)
-                # if (day_start + 12) > 24*7:
-                #     continue
-                # ax[week].axvline(x=day_start + 12, color='c', linewidth = 2, alpha = 0.7)
-
-        fig.add_subplot(111, frameon=False)
-        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
-        plt.xlabel("Time [UTC]")
-        plt.ylabel("Height [m]")
-        plt.suptitle("Number of range gates containing insects")
-        plt.tight_layout()
-
-        fig.subplots_adjust(right=0.9)
-        cbar_ax = fig.add_axes([0.93, 0.1, 0.02, 0.8])  # (left, bottom, width, height)
-        fig.colorbar(im, cax=cbar_ax)
-
-        if save_plots:
-            plt.savefig(
-                os.path.join(figure_summary_dir, "insect_population_height_timeweek.png"),
-                dpi=200)
-
+        title_str = "Number of range gates containing insects"
+        plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
+                             xtick_labs=xlabels,
+                             key_col='num_insects_height', x=unique_time_week, y=unique_height_bins,
+                             min_z=0, max_z=1, xlab="Time [UTC]", ylab="Height [m]", cmap='RdYlBu',
+                             title_str=title_str, out_dir=figure_summary_dir,
+                             out_name="insect_population_height_timeweek.png",
+                             xlim=None,
+                             ylim=(0, 1000), save_plot=save_plots)
 
         # Plot for insect_prop_bio
-        unique_time_week, unique_height_bins, weekly_data, xlabels = prepare_weekly_data_for_pcolor_plot(
-            key_col='insect_prop_bio',
-            x_col_name='time_hour_week',
-            y_col_name='height_bins',
-            in_data=population_grouped_df,
-            month=month,
-            noon_s_midnight=noon_s_midnight,
-            uniqueX=unique_time_week,
-            uniqueY=unique_height_bins)
-
-        nWeeks = len(weekly_data)
-        fig, ax = plt.subplots(nrows=nWeeks, ncols=1, figsize=(6.4 * 2.95, 4.8 * 2.0))
-        for week in range(nWeeks):
-            if weekly_data[week] is None:
-                continue
-
-            im = ax[week].pcolor(unique_time_week, unique_height_bins, np.transpose(weekly_data[week]), cmap='jet',
-                                 vmin=0, vmax=100)
-            ax[week].set_xticks(noon_s_midnight)
-            ax[week].set_xticklabels(xlabels[week])
-            ax[week].set_ylim(0, 1000)
-
-            for day_start in day_starts:
-                ax[week].axvline(x=day_start, color='k', linewidth=2, alpha=0.7)
-
-        fig.add_subplot(111, frameon=False)
-        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
-        plt.xlabel("Time [UTC]")
-        plt.ylabel("Height [m]")
-        plt.suptitle("Relative proportion of insects")
-        plt.tight_layout()
-
-        fig.subplots_adjust(right=0.9)
-        cbar_ax = fig.add_axes([0.93, 0.1, 0.02, 0.8])  # (left, bottom, width, height)
-        fig.colorbar(im, cax=cbar_ax)
-
-        if save_plots:
-            plt.savefig(
-                os.path.join(figure_summary_dir, "insect_prop_bio_height_timeweek.png"),
-                dpi=200)
+        title_str = "Relative proportion of insects"
+        plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
+                             xtick_labs=xlabels,
+                             key_col='insect_prop_bio', x=unique_time_week, y=unique_height_bins,
+                             min_z=0, max_z=100, xlab="Time [UTC]", ylab="Height [m]", cmap='jet',
+                             title_str=title_str, out_dir=figure_summary_dir,
+                             out_name="insect_prop_bio_height_timeweek.png",
+                             xlim=None,
+                             ylim=(0, 1000), save_plot=save_plots)
 
         # Plot for airspeed_bio height profile for whole month.
-        unique_time_week, unique_height_bins, weekly_data, xlabels = prepare_weekly_data_for_pcolor_plot(
-            key_col='airspeed_biological',
-            x_col_name='time_hour_week',
-            y_col_name='height_bins',
-            in_data=population_grouped_df,
-            month=month,
-            noon_s_midnight=noon_s_midnight,
-            uniqueX=unique_time_week,
-            uniqueY=unique_height_bins)
+        title_str = "Airspeed of biological echoes"
+        plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
+                             xtick_labs=xlabels,
+                             key_col='airspeed_biological', x=unique_time_week, y=unique_height_bins,
+                             min_z=None, max_z=None, xlab="Time [UTC]", ylab="Height [m]", cmap='jet',
+                             title_str=title_str, out_dir=figure_summary_dir,
+                             out_name="airspeed_biological_height_timeweek.png",
+                             xlim=None,
+                             ylim=(0, 1000), save_plot=save_plots)
 
-        nWeeks = len(weekly_data)
-        fig, ax = plt.subplots(nrows=nWeeks, ncols=1, figsize=(6.4 * 2.95, 4.8 * 2.0))
-        for week in range(nWeeks):
-            if weekly_data[week] is None:
-                continue
-
-            im = ax[week].pcolor(unique_time_week, unique_height_bins, np.transpose(weekly_data[week]), cmap='jet')
-            ax[week].set_xticks(noon_s_midnight)
-            ax[week].set_xticklabels(xlabels[week])
-            ax[week].set_ylim(0, 1000)
-
-            for day_start in day_starts:
-                ax[week].axvline(x=day_start, color='k', linewidth=2, alpha=0.7)
-
-        fig.add_subplot(111, frameon=False)
-        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
-        plt.xlabel("Time [UTC]")
-        plt.ylabel("Height [m]")
-        plt.suptitle("Airspeed of biological echoes")
-        plt.tight_layout()
-
-        fig.subplots_adjust(right=0.9)
-        cbar_ax = fig.add_axes([0.93, 0.1, 0.02, 0.8])  # (left, bottom, width, height)
-        fig.colorbar(im, cax=cbar_ax)
-
-        if save_plots:
-            plt.savefig(
-                os.path.join(figure_summary_dir, "airspeed_biological_height_timeweek.png"),
-                dpi=200)
 
         ################################################################################################################
         # Plot for mig vec height profile for whole month.
-        unique_time_week, unique_height_bins, weekly_data, xlabels = prepare_weekly_data_for_pcolor_plot(
-            key_col='biological_speed',
-            x_col_name='time_hour_week',
-            y_col_name='height_bins',
-            in_data=population_grouped_df,
-            month=month,
-            noon_s_midnight=noon_s_midnight,
-            uniqueX=unique_time_week,
-            uniqueY=unique_height_bins)
-
         nWeeks = len(weekly_data)
         fig, ax = plt.subplots(nrows=nWeeks, ncols=1, figsize=(6.4 * 2.95, 4.8 * 2.0))
         for week in range(nWeeks):
-            if weekly_data[week] is None:
+            if weekly_data['week_{}'.format(week)] is None:
                 continue
 
-            im = ax[week].pcolor(unique_time_week, unique_height_bins, np.transpose(weekly_data[week]), cmap='jet')
+            z = np.transpose(weekly_data['week_{}'.format(week)]['biological_speed'])
+            im = ax[week].pcolor(unique_time_week, unique_height_bins, z, cmap='jet')
             ax[week].set_xticks(noon_s_midnight)
             ax[week].set_xticklabels(xlabels[week])
             ax[week].set_ylim(0, 1000)
@@ -926,19 +820,9 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         #         os.path.join(figure_summary_dir, "airspeed_biological_height_timeweek.png"),
         #         dpi=200)
 
-
     if show_plots:
         plt.show()
-
-    print()
-
-
-# TODO
-# experiment id
-# plot_title_suffix
-# out_name_suffix
-# check before and after when null constraints are used.
-# apply contraints. check number of scans before and after weather correction.
+    return
 
 def Main():
     # Inputs
@@ -1022,7 +906,6 @@ def Main():
                    ('file_name', remove_cases_list)]
     idx_constraints = ImposeConstraints(wind_error, constraints)
     wind_error_constrained = wind_error[idx_constraints].reset_index(drop=True)
-    # wind_error_constrained = wind_error # TODO EM
 
     # Visualize flight speeds
     color_weather = wind_error_constrained['prop_weather']
@@ -1053,20 +936,16 @@ def Main():
                           generate_weekly_month_profiles=generate_weekly_month_profiles)
 
     # Search for cases defined by constraints.
-    # constraints = [("height_m", 700, 1000), ("insect_prop_bio", 0, 33.33), ("airspeed_insects", 0, 6),
-    #                ("airspeed_birds", 7.5, 11), ("prop_weather", 0, MAX_WEATHER_PROP),
-    #                ("prop_weather_scan", 0, MAX_WEATHER_PROP_SCAN), ('file_name', remove_cases_list)]
     # constraints = [("height_m", 700, 1000), ("insect_prop_bio", 33.33, 66.66), ("airspeed_insects", 12.5, 19),
     #                ("airspeed_birds", 12, 22), ("prop_weather", 0, MAX_WEATHER_PROP),
     #                ("prop_weather_scan", 0, MAX_WEATHER_PROP_SCAN)]
-
     constraints = [("height_m", 732, 734)]
-
     wind_error_filt = FilterFlightspeeds(wind_error_constrained, constraints)
-    # wind_error_filt = wind_error_filt.sort_values(by=['prop_birds'])
     print(np.unique(wind_error_filt.file_name))
 
     return
 
 
-Main()
+# Main()
+if __name__ == "__main__":
+    Main()
