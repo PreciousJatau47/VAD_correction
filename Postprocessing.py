@@ -161,6 +161,54 @@ def plot_weekly_averages(weekly_data, day_starts, noon_s_midnight, xtick_labs, k
     return
 
 
+def plot_weekly_averages_with_vector_field(weekly_data, day_starts, noon_s_midnight, xtick_labs, key_col, x, y, vec_df,
+                                           x_col, y_col, u_col, v_col, cmap, xlab, ylab, title_str, min_z, max_z,
+                                           out_dir, out_name, xlim=None, ylim=None, save_plot=False):
+    assert "week" in vec_df.columns, "DataFrame must contain a week column."
+    nWeeks = len(weekly_data)
+    fig, ax = plt.subplots(nrows=nWeeks, ncols=1, figsize=(6.4 * 2.95, 4.8 * 2.0))
+    for week in range(nWeeks):
+        z = weekly_data['week_{}'.format(week)][key_col]
+        if z is None:
+            continue
+
+        week_idx = vec_df["week"] == week
+
+        im = ax[week].pcolor(x, y, np.transpose(z), cmap=cmap, vmin=min_z, vmax=max_z)
+        ax[week].quiver(vec_df.loc[week_idx, x_col], vec_df.loc[week_idx, y_col], vec_df.loc[week_idx, u_col],
+                        vec_df.loc[week_idx, v_col], width=0.0008, scale=0.5, scale_units='x')
+        ax[week].set_xticks(noon_s_midnight)
+        ax[week].set_xticklabels(xtick_labs[week])
+        if xlim:
+            ax[week].set_xlim(xlim)
+        if ylim:
+            ax[week].set_ylim(ylim)
+
+        for day_start in day_starts:
+            ax[week].axvline(x=day_start, color='k', linewidth=2, alpha=0.7)
+            # if (day_start + 12) > 24*7:
+            #     continue
+            # ax[week].axvline(x=day_start + 12, color='c', linewidth = 2, alpha = 0.7)
+
+    fig.add_subplot(111, frameon=False)
+    plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    plt.suptitle(title_str)
+    plt.tight_layout()
+
+    fig.subplots_adjust(right=0.9)
+    cbar_ax = fig.add_axes([0.93, 0.1, 0.02, 0.8])  # (left, bottom, width, height)
+    fig.colorbar(im, cax=cbar_ax)
+
+    if save_plot:
+        plt.savefig(
+            os.path.join(out_dir, out_name),
+            dpi=200)
+
+    return
+
+
 def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plots, figure_summary_dir,
                           plot_title_suffix, out_name_suffix, max_airspeed=None, show_plots=True,
                           generate_weekly_month_profiles=True):
@@ -636,46 +684,6 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                          out_dir=figure_summary_dir, out_name="averaged_insect_prop_height_timeday.png", min_z=0,
                          max_z=100, xlim=(0, 24), ylim=(0, 1000), save_plot=save_plots)
 
-    ####################################################################################################################
-    # # Plot. Migration vector (Vr) for one day
-    # # TODO(pjatau) Refactor or em.
-    # curr_day = 1
-    # idx_day = echo_profile_df['day'] == 1
-    # print(np.unique(echo_profile_df['day']))
-    # print(np.sum(idx_day))
-    # print(echo_profile_df.columns)
-    # mig_height_time_df = echo_profile_df.loc[
-    #     idx_day, ["height_bins", "time_hour_bins", "insect_prop_bio", "biological_speed", "biological_direction"]]
-    # mig_height_time_df = mig_height_time_df.groupby(["height_bins","time_hour_bins"], as_index=False).mean() # TODO why is this needed
-    #
-    # mig_height_time_df["birds_U"], mig_height_time_df["birds_V"] = Polar2CartesianComponentsDf(spd=1,
-    #                                                                                            dirn=mig_height_time_df[
-    #                                                                                                "biological_direction"])
-    #
-    # time_hr_bins, unique_height_bins, birds_spd_grid = prepare_pcolor_grid_from_series(
-    #     mig_height_time_df['time_hour_bins'],
-    #     mig_height_time_df['height_bins'],
-    #     mig_height_time_df['biological_speed'], uniqueX=unique_time_hr,
-    #     uniqueY=unique_height_bins)
-    #
-    # fig, ax = plt.subplots()
-    # cax = ax.pcolor(time_hr_bins, unique_height_bins, np.transpose(birds_spd_grid), cmap='jet')
-    # ax.quiver(mig_height_time_df["time_hour_bins"], mig_height_time_df["height_bins"], mig_height_time_df["birds_U"], mig_height_time_df["birds_V"])
-    # cbar = fig.colorbar(cax)
-    # ax.set_xlim(0, 24)
-    # ax.set_ylim(0, 1000)
-    # ax.set_xlabel('Time [UTC]')
-    # ax.set_ylabel('Height [m]')
-    # ax.set_title("biological spd, day {}".format(curr_day))
-    # plt.tight_layout()
-    #
-    # if save_plots:
-    #     plt.savefig(
-    #         os.path.join(figure_summary_dir, "vr.png"),
-    #         dpi=200)
-    ####################################################################################################################
-
-
     # Plot: averaged number of birds, insects x height x time
     fig, ax = plt.subplots(1, 2, figsize=(6.4 * 1.5, 4.8))
     cax = ax[0].pcolor(time_hr_bins, unique_height_bins, np.transpose(height_time_grid['num_birds_height']),
@@ -707,8 +715,8 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
         population_df = wind_error.loc[:,
                         ["month", "day", "time_hour", "insect_prop_bio", "height_m", "prop_weather_scan",
-                         "num_insects_height", "num_birds_height", "airspeed_biological", "biological_speed",
-                         "biological_direction"]]
+                         "num_insects_height", "num_birds_height", "airspeed_biological", "biological_wind_offset",
+                         "biological_speed", "biological_direction", "wind_speed", "wind_direction"]]
 
         population_df["height_bins"] = population_df['height_m'] // delta_height * delta_height + delta_height / 2
         population_df["time_hour_bins"] = population_df[
@@ -733,7 +741,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
         unique_time_week, unique_height_bins, weekly_data, xlabels = prepare_weekly_data_for_pcolor_plot(
             key_cols=['num_birds_height', 'num_insects_height', 'insect_prop_bio', 'airspeed_biological',
-                      'biological_speed'],
+                      'biological_speed','wind_speed'],
             x_col_name='time_hour_week',
             y_col_name='height_bins',
             in_data=population_grouped_df,
@@ -788,37 +796,54 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
 
         ################################################################################################################
+        # Plot for wind vec height profile for whole month.
+        population_grouped_df["wind_U"], population_grouped_df["wind_V"] = Polar2CartesianComponentsDf(spd=0.5, dirn=
+        population_grouped_df["wind_direction"])
+        max_speed = max(np.nanmax(population_grouped_df["biological_speed"]),
+                        np.nanmax(population_grouped_df["wind_speed"]))
+
+        plot_weekly_averages_with_vector_field(weekly_data=weekly_data, day_starts=day_starts,
+                                               noon_s_midnight=noon_s_midnight, xtick_labs=xlabels,
+                                               key_col='wind_speed', x=unique_time_week, y=unique_height_bins,
+                                               vec_df=population_grouped_df,
+                                               x_col="time_hour_week", y_col="height_bins", u_col="wind_U",
+                                               v_col="wind_V", cmap='jet', xlab="Time [UTC]", ylab="Height [m]",
+                                               title_str=r"$Wind \, velocity$", min_z=0, max_z=max_speed,
+                                               out_dir=figure_summary_dir,
+                                               out_name="wind_velocity_height_timeweek.png", xlim=None, ylim=(0, 1000),
+                                               save_plot=save_plots)
+
+        ################################################################################################################
         # Plot for mig vec height profile for whole month.
-        nWeeks = len(weekly_data)
-        fig, ax = plt.subplots(nrows=nWeeks, ncols=1, figsize=(6.4 * 2.95, 4.8 * 2.0))
-        for week in range(nWeeks):
-            if weekly_data['week_{}'.format(week)] is None:
-                continue
+        population_grouped_df["bio_U"], population_grouped_df["bio_V"] = Polar2CartesianComponentsDf(spd=0.5, dirn=
+        population_grouped_df["biological_direction"])
 
-            z = np.transpose(weekly_data['week_{}'.format(week)]['biological_speed'])
-            im = ax[week].pcolor(unique_time_week, unique_height_bins, z, cmap='jet')
-            ax[week].set_xticks(noon_s_midnight)
-            ax[week].set_xticklabels(xlabels[week])
-            ax[week].set_ylim(0, 1000)
+        plot_weekly_averages_with_vector_field(weekly_data=weekly_data, day_starts=day_starts,
+                                               noon_s_midnight=noon_s_midnight, xtick_labs=xlabels,
+                                               key_col='biological_speed', x=unique_time_week, y=unique_height_bins,
+                                               vec_df=population_grouped_df,
+                                               x_col="time_hour_week", y_col="height_bins", u_col="bio_U",
+                                               v_col="bio_V", cmap='jet', xlab="Time [UTC]", ylab="Height [m]",
+                                               title_str="Biological echo velocity", min_z=0, max_z=max_speed,
+                                               out_dir=figure_summary_dir,
+                                               out_name="biological_vel_height_timeweek.png", xlim=None, ylim=(0, 1000),
+                                               save_plot=save_plots)
 
-            for day_start in day_starts:
-                ax[week].axvline(x=day_start, color='k', linewidth=2, alpha=0.7)
+        ################################################################################################################
+        # Plot for flight vec height profile for whole month.
+        population_grouped_df["bio_off_U"], population_grouped_df["bio_off_V"] = Polar2CartesianComponentsDf(
+            spd=0.5, dirn=population_grouped_df["biological_wind_offset"])
 
-        fig.add_subplot(111, frameon=False)
-        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
-        plt.xlabel("Time [UTC]")
-        plt.ylabel("Height [m]")
-        plt.suptitle(r"$\vec{V}_r^bio")
-        plt.tight_layout()
-
-        fig.subplots_adjust(right=0.9)
-        cbar_ax = fig.add_axes([0.93, 0.1, 0.02, 0.8])  # (left, bottom, width, height)
-        fig.colorbar(im, cax=cbar_ax)
-
-        # if save_plots:
-        #     plt.savefig(
-        #         os.path.join(figure_summary_dir, "airspeed_biological_height_timeweek.png"),
-        #         dpi=200)
+        plot_weekly_averages_with_vector_field(weekly_data=weekly_data, day_starts=day_starts,
+                                               noon_s_midnight=noon_s_midnight, xtick_labs=xlabels,
+                                               key_col='airspeed_biological', x=unique_time_week, y=unique_height_bins,
+                                               vec_df=population_grouped_df,
+                                               x_col="time_hour_week", y_col="height_bins", u_col="bio_off_U",
+                                               v_col="bio_off_V", cmap='jet', xlab="Time [UTC]", ylab="Height [m]",
+                                               title_str="Biological echo flight velocity", min_z=0, max_z=None,
+                                               out_dir=figure_summary_dir,
+                                               out_name="flight_vel_bio_height_timeweek.png", xlim=None, ylim=(0, 1000),
+                                               save_plot=save_plots)
 
     if show_plots:
         plt.show()
@@ -836,7 +861,7 @@ def Main():
     figure_dir = "./figures"
     plot_title_suffix = "May 1 - 31, 2018"
     out_name_suffix = "May_1_31_2018"
-    save_plots = False
+    save_plots = True
     generate_weekly_month_profiles = True #False
 
     airspeed_log_dir = r'.\batch_analysis_logs'
