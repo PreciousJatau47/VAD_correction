@@ -39,6 +39,15 @@ def CalcPolarDiffVec(spd1, dirn1, spd2, dirn2):
     spd_diff, dirn_diff = Cartesian2PolarComponentsDf(u_diff, v_diff)
     return spd_diff, dirn_diff
 
+
+def CalcSmallAngleDirDiffDf(dirn1, dirn2):
+    diff = dirn1 - dirn2
+    idx_neg_wrap = diff < -180
+    diff[idx_neg_wrap] += 360
+    idx_pos_wrap = diff > 180
+    diff[idx_pos_wrap] += -360
+    return diff
+
 def TestWindUtils():
     # Test for CalcCartesianDiffVec
     # v1 = [0 1], v2 = [1,0], result = [-1 1]
@@ -93,13 +102,14 @@ def TestWindUtils():
     # Test for flight vector
     scan_name_base = "KOHX20180503_180336_V06"
 
-    exp_airspeed_path = './expected_results/KOHX_20180503_test_data\hca_weather_corrected\KOHX_20180503_test_data_rap_130.pkl'
+    exp_airspeed_path = './expected_results/KOHX_20180503_test_data/hca_weather_corrected/KOHX_20180503_test_data_rap_130.pkl'
     with open(exp_airspeed_path, 'rb') as p_in:
         exp_airspeed_df_full = pickle.load(p_in)
     p_in.close()
 
     # wind_error_path = './batch_analysis_logs\KOHX_20180503_test_data_launched_202327_15/KOHX_20180503_test_data.pkl'
-    wind_error_path = './batch_analysis_logs\KOHX_20180503_test_data_launched_202328_16/KOHX_20180503_test_data.pkl'
+    # wind_error_path = './batch_analysis_logs/KOHX_20180503_test_data_launched_202328_16/KOHX_20180503_test_data.pkl'
+    wind_error_path = './batch_analysis_logs/KOHX_20180503_test_data_launched_2023220_10/KOHX_20180503_test_data.pkl'
     with open(wind_error_path, 'rb') as p_in:
         wind_error_df_full = pickle.load(p_in)[0]
     p_in.close()
@@ -143,4 +153,5 @@ def TestWindUtils():
 
     return
 
-# TestWindUtils()
+if __name__ == "__main__":
+    TestWindUtils()
