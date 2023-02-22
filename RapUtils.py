@@ -75,11 +75,11 @@ def GetRapWindProfile(in_lat, in_lon, rap_dir, rap_file, log_dir, log_base, show
 
     gr = pygrib.open(rap_full_path)
     levels = np.arange(100, 1000 + 25, 25)  # np.arange(100, 175, 25)
-    gpt_height_level = gr.select(name='Geopotential Height', typeOfLevel='isobaricInhPa', level=levels[0])
+    gpt_height_level = gr.select(name='Geopotential height', typeOfLevel='isobaricInhPa', level=levels[0])
     lat, lon = gpt_height_level[0].latlons()
 
     r_idx, c_idx = GetLatLonIdx(in_lat, in_lon, 0.5, lat, lon)
-    gpt_height_profile = GetVariableProfile(r_idx, c_idx, gr, 'Geopotential Height', levels)
+    gpt_height_profile = GetVariableProfile(r_idx, c_idx, gr, 'Geopotential height', levels)
     U_wind = GetVariableProfile(r_idx, c_idx, gr, 'U component of wind', levels)
     V_wind = GetVariableProfile(r_idx, c_idx, gr, 'V component of wind', levels)
     wind_profile = pd.DataFrame({"windU": U_wind, "windV": V_wind, "HGHT": gpt_height_profile})
@@ -124,7 +124,7 @@ def GetRapWindProfileRelativeToRadar(in_lat, in_lon, radar_location, rap_dir, ra
     print("Distance between radar and sounding station is {} km.".format(round(radar_to_rap / 1000, 2)))
 
     gt_wind_df, gt_wind_location = GetRapWindProfile(in_lat, in_lon, rap_dir, rap_file, log_dir, log_base,
-                                                     show_fig=False, force_update=False,
+                                                     show_fig=False, force_update=force_update,
                                                      save_wind_profile=True)
 
     gt_wind_df['HGHT'] = gt_wind_df['HGHT'] - radar_location['height']
