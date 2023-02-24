@@ -206,5 +206,5 @@ def Main():
 
     wind_speed, wind_dir, vad_fit = fitVAD(t, data, signal_func, showDebugPlot, description='')
 
-# Main()
-# TestVADUtils()
+if __name__ == "__main__":
+    Main()
