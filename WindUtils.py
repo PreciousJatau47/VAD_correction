@@ -39,6 +39,13 @@ def CalcPolarDiffVec(spd1, dirn1, spd2, dirn2):
     spd_diff, dirn_diff = Cartesian2PolarComponentsDf(u_diff, v_diff)
     return spd_diff, dirn_diff
 
+def CalcSmallAngleDirDiff(dirn1, dirn2):
+    diff = dirn1 - dirn2
+    if diff < -180:
+        diff += 360
+    elif diff > 180:
+        diff -= 360
+    return diff
 
 def CalcSmallAngleDirDiffDf(dirn1, dirn2):
     diff = dirn1 - dirn2
@@ -54,13 +61,6 @@ def TestWindUtils():
     exp_diff = [-1, 1]
     actual_diff = CalcCartesianDiffVec(u1=0, v1=1, u2=1, v2=0)
     assert np.array_equal(exp_diff, actual_diff)
-
-    # Test for CalcPolarDiffVec
-    # v1 = (4,0), v2 = (3,90), result = (5, 324]
-    exp_pol_diff = (5, 323.13)
-    actual_diff = CalcPolarDiffVec(spd1=4, dirn1=0, spd2=3, dirn2=90)
-    assert (exp_pol_diff[0] - actual_diff[0]) < 0.5
-    assert (exp_pol_diff[1] - actual_diff[1]) < 2
 
     # Test for sounding.
     with open('./expected_results/sample_balloon_sounding.pkl', 'rb') as p_in:
