@@ -11,14 +11,21 @@ FLIGHT_SPD_BIRDS = 6.101
 WIND_OFFSET_INSECTS = -8
 WIND_OFFSET_BIRDS = 14
 
+# Classifier metrics
+TPR = 0.862
+TNR = 0.811
+
 signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])
+
 
 def GenerateVAD(speed, dirn, dirn_grid):
     phase = (90 - dirn) * np.pi / 180
     return signal_func([speed, phase], dirn_grid)
 
+
 def GenerateNoiseNormal(mu=0, sdev=1, num_samples=100):
     return sdev * np.random.randn(num_samples) + mu
+
 
 def SearchAlphaFlightAndMagMig(alpha_mig_true, spd_flight, spd_wind, alpha_wind):
     u_w, v_w = Polar2CartesianComponentsDf(spd=spd_wind, dirn=alpha_wind)
@@ -81,27 +88,67 @@ def GenerateWinds(wind_spd, wind_dirn, wind_offset_insects, num_samples, noise_m
         plt.legend(loc='best')
         plt.show()
 
-    return {'vad_winds': vad_winds, 'vad_birds': vad_birds, 'vad_insects': vad_insects}
+    return {'vad_winds': vad_winds, 'vad_birds': vad_birds, 'vad_insects': vad_insects}, alpha_grid
+
+
+def MixVADWinds(az_grid, vad_birds, vad_insects, insect_ratio_bio=0.5, show_plot=False):
+    num_samples = len(az_grid)
+    idxs_az = [i for i in range(len(az_grid))]
+    num_insects_true = int(insect_ratio_bio * num_samples)
+    num_birds_true = num_samples - num_insects_true
+
+    # Generate true vad mixture
+    is_birds_true = np.zeros(az_grid.shape, dtype=bool)
+    idx_birds = np.random.choice(a=idxs_az, size=num_birds_true, replace=False)
+    is_birds_true[idx_birds] = 1
+    idx_insects = list(set(idxs_az) - set(idx_birds))
+    vad_measured = np.where(is_birds_true, vad_birds, vad_insects)
+
+    if show_plot:
+        col_true = np.where(is_birds_true, 'blue', 'red')
+        fig, ax = plt.subplots()
+        ax.scatter(az_grid, vad_measured, c=col_true, alpha=0.2)
+        plt.show()
+
+    return vad_measured, is_birds_true, idx_birds, idx_insects
+
+
+def SimulateBIPredictions(tpr=0.95, tnr=0.95, idx_birds=[], idx_insects=[]):
+    num_birds_true = len(idx_birds)
+    num_insects_true = len(idx_insects)
+    tpn = round(tpr * num_birds_true)
+    fpn = round((1 - tnr) * num_insects_true)
+
+    tp_idxs = np.random.choice(a=idx_birds, size=tpn, replace=False)
+    fp_idxs = np.random.choice(a=idx_insects, size=fpn, replace=False)
+    idx_birds_pred = np.concatenate([tp_idxs, fp_idxs])
+    is_birds_pred = np.zeros((num_birds_true + num_insects_true,), dtype=bool)
+    is_birds_pred[idx_birds_pred] = 1
+    return is_birds_pred
 
 
 # TODO(pjatau)
-# 1. Work on cross contamination
-
+# 1. Calculate airspeeds for true and predicted classes.
+# 2. Explore 1 for different insect_ratio_bio.
 def Main():
-
-    num_samples = 1080
+    num_samples = 2160
     wind_spd = WIND_SPD
-    wind_dirn = 90 #WIND_DIRN
-    wind_offset_insects = WIND_OFFSET_INSECTS #-4
+    wind_dirn = 90  # WIND_DIRN
+    wind_offset_insects = WIND_OFFSET_INSECTS  # -4
 
-    winds = GenerateWinds(wind_spd=wind_spd, wind_dirn=wind_dirn, wind_offset_insects=wind_offset_insects,
-                          num_samples=num_samples, noise_mean=0, noise_sdev=1, show_debug_plot=False)
+    winds, az_grid = GenerateWinds(wind_spd=wind_spd, wind_dirn=wind_dirn, wind_offset_insects=wind_offset_insects,
+                                   num_samples=num_samples, noise_mean=0, noise_sdev=1, show_debug_plot=False)
 
-    insect_ratio_bio = 0.5
-    num_birds_true = int((1-insect_ratio_bio)*num_samples)
-    num_insects_true = int(insect_ratio_bio*num_samples)
-    print(num_birds_true)
-    print(num_insects_true)
+    # Mix bird and insect vads
+    vad_measured, is_birds_true, idx_birds, idx_insects = MixVADWinds(az_grid=az_grid, vad_birds=winds['vad_birds'],
+                                                                      vad_insects=winds['vad_insects'],
+                                                                      insect_ratio_bio=0.5,
+                                                                      show_plot=False)
+
+    # Simulate model predictions
+    # num. predicted birds = TPR * nbirds + (1-TNR)*ninsects
+    tpr, tnr = 0.95, 0.95
+    is_birds_pred = SimulateBIPredictions(tpr=tpr, tnr=tnr, idx_birds=idx_birds, idx_insects=idx_insects)
 
     # pred_speed, pred_dirn, vad_fit = fitVAD(pred_var=alpha_grid, resp_var=vad_gen, signal_func=signal_func,
     #                                         showDebugPlot=True, description='')
