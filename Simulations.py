@@ -86,6 +86,7 @@ def GenerateWinds(wind_spd, wind_dirn, wind_offset_insects, num_samples, noise_m
         ax.grid(True)
         ax.set_title(title_str)
         plt.legend(loc='best')
+        # plt.savefig("VADS.png", dpi = 200)
         plt.show()
 
     return {'vad_winds': vad_winds, 'vad_birds': vad_birds, 'vad_insects': vad_insects}, alpha_grid
@@ -102,18 +103,26 @@ def MixVADWinds(az_grid, vad_birds, vad_insects, insect_ratio_bio=0.5, show_plot
     idx_birds = np.random.choice(a=idxs_az, size=num_birds_true, replace=False)
     is_birds_true[idx_birds] = 1
     idx_insects = list(set(idxs_az) - set(idx_birds))
+    idx_insects = np.array(idx_insects, dtype=int)
     vad_measured = np.where(is_birds_true, vad_birds, vad_insects)
 
     if show_plot:
         col_true = np.where(is_birds_true, 'blue', 'red')
         fig, ax = plt.subplots()
         ax.scatter(az_grid, vad_measured, c=col_true, alpha=0.2)
+        ax.grid(True)
+        ax.set_xlabel(r'$\Phi (^\circ)$')
+        ax.set_ylabel('Speed (mps)')
+        ax.set_title("Insect prop. bio: {}".format(round(insect_ratio_bio,1)))
+        # plt.savefig("vad_mix_{}.png".format(int(insect_ratio_bio*100)))
         plt.show()
 
     return vad_measured, is_birds_true, idx_birds, idx_insects
 
 
 def SimulateBIPredictions(tpr=0.95, tnr=0.95, idx_birds=[], idx_insects=[]):
+
+    # num. predicted birds = TPR * nbirds + (1-TNR)*ninsects
     num_birds_true = len(idx_birds)
     num_insects_true = len(idx_insects)
     tpn = round(tpr * num_birds_true)
@@ -126,34 +135,107 @@ def SimulateBIPredictions(tpr=0.95, tnr=0.95, idx_birds=[], idx_insects=[]):
     is_birds_pred[idx_birds_pred] = 1
     return is_birds_pred
 
+def CalculateBirdAndInsectAirspeedsFromVAD(az_grid, vad_measured, is_birds, wind_spd, wind_dirn):
+    # Extract VADs.
+    vad_birds = vad_measured[is_birds]
+    az_birds = az_grid[is_birds]
+    vad_insects = vad_measured[np.logical_not(is_birds)]
+    az_insects = az_grid[np.logical_not(is_birds)]
+
+    # fig, ax = plt.subplots()
+    # ax.scatter(az_birds, vad_birds, c='blue', alpha=0.2, label='birds')
+    # ax.scatter(az_insects, vad_insects, c='red', alpha=0.2, label='insects')
+    # plt.legend()
+    # plt.show()
+
+    # Calculate airspeeds.
+    pred_speed_birds, pred_dirn_birds, _ = fitVAD(pred_var=az_birds, resp_var=vad_birds, signal_func=signal_func,
+                                                  showDebugPlot=False, description='')
+    # print("Predicted. speed: {} mps. direction: {} degrees.".format(pred_speed_birds, pred_dirn_birds))
+    airspeed_birds = CalcPolarDiffVec(spd1=pred_speed_birds, dirn1=pred_dirn_birds,
+                                      spd2=wind_spd, dirn2=wind_dirn)[0]
+
+    pred_speed_insects, pred_dirn_insects, _ = fitVAD(pred_var=az_insects, resp_var=vad_insects,
+                                                      signal_func=signal_func,
+                                                      showDebugPlot=False, description='')
+    # print("Predicted. speed: {} mps. direction: {} degrees.".format(pred_speed_insects, pred_dirn_insects))
+    airspeed_insects = CalcPolarDiffVec(spd1=pred_speed_insects, dirn1=pred_dirn_insects,
+                                        spd2=wind_spd, dirn2=wind_dirn)[0]
+    return airspeed_birds, airspeed_insects
+
+
 
 # TODO(pjatau)
 # 1. Calculate airspeeds for true and predicted classes.
 # 2. Explore 1 for different insect_ratio_bio.
+# 3. Add options to save plots
 def Main():
-    num_samples = 2160
+    # Wind parameters.
+    num_samples = 8100 #10800  # 2160
     wind_spd = WIND_SPD
     wind_dirn = 90  # WIND_DIRN
     wind_offset_insects = WIND_OFFSET_INSECTS  # -4
+
+    # Model parameters.
+    tpr, tnr = .9, .9 #TPR, TNR
 
     winds, az_grid = GenerateWinds(wind_spd=wind_spd, wind_dirn=wind_dirn, wind_offset_insects=wind_offset_insects,
                                    num_samples=num_samples, noise_mean=0, noise_sdev=1, show_debug_plot=False)
 
     # Mix bird and insect vads
-    vad_measured, is_birds_true, idx_birds, idx_insects = MixVADWinds(az_grid=az_grid, vad_birds=winds['vad_birds'],
-                                                                      vad_insects=winds['vad_insects'],
-                                                                      insect_ratio_bio=0.5,
-                                                                      show_plot=False)
+    mixing_ratios = np.linspace(0,1,20)
+    airspeeds_birds_true = []
+    airspeeds_ins_true = []
+    airspeeds_birds_bi = []
+    airspeeds_ins_bi = []
 
-    # Simulate model predictions
-    # num. predicted birds = TPR * nbirds + (1-TNR)*ninsects
-    tpr, tnr = 0.95, 0.95
-    is_birds_pred = SimulateBIPredictions(tpr=tpr, tnr=tnr, idx_birds=idx_birds, idx_insects=idx_insects)
+    mixing_ratios_pred = []
 
-    # pred_speed, pred_dirn, vad_fit = fitVAD(pred_var=alpha_grid, resp_var=vad_gen, signal_func=signal_func,
-    #                                         showDebugPlot=True, description='')
-    # print("Desired. speed: {} mps. direction: {} degrees.".format(mig_spd_insects, desired_dirn))
-    # print("Predicted. speed: {} mps. direction: {} degrees.".format(pred_speed, pred_dirn))
+    for insect_ratio_bio in mixing_ratios:
+        print(insect_ratio_bio)
+        vad_measured, is_birds_true, idx_birds, idx_insects = MixVADWinds(az_grid=az_grid, vad_birds=winds['vad_birds'],
+                                                                          vad_insects=winds['vad_insects'],
+                                                                          insect_ratio_bio=insect_ratio_bio,
+                                                                          show_plot=False)
+
+        # Calculate airspeeds for ground truth.
+        airspd_birds, airspd_ins = CalculateBirdAndInsectAirspeedsFromVAD(az_grid=az_grid, vad_measured=vad_measured,
+                                                                          is_birds=is_birds_true, wind_spd=wind_spd,
+                                                                          wind_dirn=wind_dirn)
+        airspeeds_birds_true.append(airspd_birds)
+        airspeeds_ins_true.append(airspd_ins)
+
+        # Simulate model predictions
+        is_birds_pred = SimulateBIPredictions(tpr=tpr, tnr=tnr, idx_birds=idx_birds, idx_insects=idx_insects)
+
+        # Calculate airspeeds for model predictions.
+        airspd_birds_bi, airspd_ins_bi = CalculateBirdAndInsectAirspeedsFromVAD(az_grid=az_grid,
+                                                                                vad_measured=vad_measured,
+                                                                                is_birds=is_birds_pred,
+                                                                                wind_spd=wind_spd,
+                                                                                wind_dirn=wind_dirn)
+        airspeeds_birds_bi.append(airspd_birds_bi)
+        airspeeds_ins_bi.append(airspd_ins_bi)
+
+        mixing_ratios_pred.append(np.sum(is_birds_pred == False)/len(is_birds_pred))
+
+
+
+    # True airspeeds at different insect prop.
+    fig, ax = plt.subplots()
+    ax.plot(mixing_ratios, airspeeds_ins_true, c='red', label='true insects', alpha=0.3)
+    ax.plot(mixing_ratios, airspeeds_birds_true, c='blue', label='true birds', alpha=0.3)
+    ax.plot(mixing_ratios, airspeeds_ins_bi, c='red', label='pred. insects')
+    ax.plot(mixing_ratios, airspeeds_birds_bi, c='blue', label='pred. birds')
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 8.5)
+    ax.grid(True)
+    ax.legend(loc="upper right")
+    ax.set_xlabel("% insect echoes (no units)")
+    ax.set_ylabel("airspeed (mps)")
+    ax.set_title("Simulated airspeeds vs % insects")
+    # plt.savefig("airspeeds_comp.png", dpi = 200)
+    plt.show()
 
     return
 
