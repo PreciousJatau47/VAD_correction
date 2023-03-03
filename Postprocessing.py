@@ -96,7 +96,7 @@ def prepare_weekly_data_for_pcolor_plot(key_cols, x_col_name, y_col_name, in_dat
 
 
 def plot_averages_pcolor(x, y, z, cmap, xlab, ylab, title_str, out_dir, out_name, min_z, max_z, xlim=None, ylim=None,
-                         plot_txt=None, save_plot=False):
+                         cbar_label = None, plot_txt=None, save_plot=False):
 
     fig, ax = plt.subplots()
     cax = ax.pcolor(x, y, z, vmin=min_z, vmax=max_z,
@@ -104,6 +104,7 @@ def plot_averages_pcolor(x, y, z, cmap, xlab, ylab, title_str, out_dir, out_name
     if plot_txt:
         ax.text(plot_txt[0], plot_txt[1], plot_txt[2])
     cbar = fig.colorbar(cax)
+    cbar.set_label(cbar_label, rotation = 270, labelpad = 20)
     if xlim:
        ax.set_xlim(xlim)
     if ylim:
@@ -121,7 +122,7 @@ def plot_averages_pcolor(x, y, z, cmap, xlab, ylab, title_str, out_dir, out_name
 
 def plot_averages_pcolor_with_vector_field(x, y, z, cmap, xlab, ylab, title_str, out_dir, out_name, min_z, max_z,
                                            vec_df, x_col, y_col, u_col, v_col, xlim=None, ylim=None, plot_txt=None,
-                                           save_plot=False):
+                                           cbar_label = None, save_plot=False):
 
     fig, ax = plt.subplots()
     cax = ax.pcolor(x, y, z, vmin=min_z, vmax=max_z, cmap=cmap)
@@ -129,6 +130,7 @@ def plot_averages_pcolor_with_vector_field(x, y, z, cmap, xlab, ylab, title_str,
     if plot_txt:
         ax.text(plot_txt[0], plot_txt[1], plot_txt[2])
     cbar = fig.colorbar(cax)
+    cbar.set_label(cbar_label, rotation = 270, labelpad = 20)
     if xlim:
        ax.set_xlim(xlim)
     if ylim:
@@ -145,7 +147,8 @@ def plot_averages_pcolor_with_vector_field(x, y, z, cmap, xlab, ylab, title_str,
 
 
 def plot_weekly_averages(weekly_data, day_starts, noon_s_midnight, xtick_labs, key_col, x, y, cmap, xlab, ylab,
-                         title_str, min_z, max_z, out_dir, out_name, xlim=None, ylim=None, save_plot=False):
+                         title_str, min_z, max_z, out_dir, out_name, xlim=None, ylim=None, cbar_label=None,
+                         save_plot=False):
     nWeeks = len(weekly_data)
     fig, ax = plt.subplots(nrows=nWeeks, ncols=1, figsize=(6.4 * 2.95, 4.8 * 2.0))
     for week in range(nWeeks):
@@ -169,13 +172,14 @@ def plot_weekly_averages(weekly_data, day_starts, noon_s_midnight, xtick_labs, k
 
     fig.add_subplot(111, frameon=False)
     plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
-    plt.xlabel(xlab)
-    plt.ylabel(ylab)
+    plt.xlabel(xlab, labelpad=10)
+    plt.ylabel(ylab, labelpad=15)
     plt.tight_layout()
 
     fig.subplots_adjust(right=0.9, top=0.95)
     cbar_ax = fig.add_axes([0.93, 0.1, 0.02, 0.8])  # (left, bottom, width, height)
-    fig.colorbar(im, cax=cbar_ax)
+    cbar = fig.colorbar(im, cax=cbar_ax)
+    cbar.set_label(cbar_label, rotation=270, labelpad=20)
     plt.suptitle(title_str)
 
     if save_plot:
@@ -347,11 +351,12 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
     plt.xlabel("Airspeed (m/s)")
     plt.ylabel("Count (no units)")
-    plt.suptitle("Airspeed for single specie scans. {}% impurity.".format(impurity_threshold))
+    # plt.suptitle("Airspeed for single specie scans. {}% impurity.".format(impurity_threshold))
     plt.tight_layout()
 
     plt.subplots_adjust(top=0.9)
-    plt.suptitle("Airspeed for single specie scans. {}% impurity.".format(impurity_threshold))
+    # plt.suptitle("Airspeed for single specie scans. {}% impurity.".format(impurity_threshold))
+    plt.suptitle("Comparison of wind biases from mass bird and insect migration")
 
     if save_plots:
         plt.savefig(os.path.join(figure_summary_dir, "".join(["single_specie_airspeeds_", out_name_suffix, ".png"])),
@@ -546,7 +551,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_diff'], cmap='jet',
                          xlab='insect prop bio [%]', ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="airspeed_difference.png", min_z=-max_amp,
-                         max_z=max_amp, xlim=(0, 100), ylim=(0, 1000), plot_txt=(55, 800, info_str),
+                         max_z=max_amp, xlim=(0, 100), ylim=(0, 1000), plot_txt=(55, 800, info_str), cbar_label="[m/s]",
                          save_plot=save_plots)
 
     # Plot of height vs insect prop vs airspeed_bio
@@ -556,23 +561,26 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     height_ip_df["abs_bio_off_U"], height_ip_df["abs_bio_off_V"] = \
         Polar2CartesianComponentsDf(spd=0.5, dirn=height_ip_df["abs_bio_wind_offset"])
 
+    title_str = "Averaged biological echo biases"
     plot_averages_pcolor_with_vector_field(x=ins_prop_bins, y=unique_height_bins,
                                            z=height_ip_grid['airspeed_biological'], cmap='jet',
-                                           xlab='insect prop bio [%]', ylab='height [m]', title_str=r"$airspeed_{bio}$",
+                                           xlab='insect prop bio [%]', ylab='height [m]', title_str=title_str,
                                            out_dir=figure_summary_dir,
                                            out_name="airspeed_biological_height_insectprop.png", min_z=0,
                                            max_z=max_airspeed_bio, vec_df=height_ip_df, x_col="insect_prop_bins",
                                            y_col="height_bins", u_col="abs_bio_off_U", v_col="abs_bio_off_V",
-                                           xlim=(0, 100), ylim=(0, 1000), save_plot=save_plots)
+                                           xlim=(0, 100), ylim=(0, 1000), cbar_label="[m/s]",
+                                           save_plot=save_plots)
 
     # Plot of height vs insect prop vs airspeed_insects
     max_airspeed_ins = np.max(np.abs(height_ip_df['airspeed_insects']))
     print("max_airspeed_ins: ", max_airspeed_ins)
 
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_insects'], cmap='jet',
-                         xlab='insect prop bio [%]', ylab='height [m]', title_str=r"$airspeed_{insects}$",
+                         xlab='insect prop bio [%]', ylab='height [m]', title_str=r"$bias_{insects}$",
                          out_dir=figure_summary_dir, out_name="airspeed_ins_height_insectprop.png", min_z=0,
-                         max_z=max_airspeed_bio, xlim=(0, 100), ylim=(0, 1000), save_plot=save_plots)
+                         max_z=max_airspeed_bio, xlim=(0, 100), ylim=(0, 1000), cbar_label="[m/s]",
+                         save_plot=save_plots)
 
 
     ####################################################################################################################
@@ -610,18 +618,18 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         uniqueX=unique_height_bins,
         uniqueY=unique_dev_mig_bins)
 
-    title_str = r"flight compensation, $airspeed_{birds}$"
+    title_str = r"Birds flight speed compensation"
     plot_averages_pcolor(x=unique_dev_mig_bins, y=unique_height_bins, z=height_dev_grid['airspeed_birds'], cmap='jet',
                          xlab=r'$\alpha_{w} - \alpha_{mig} [^\circ$]', ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="flight_comp_airspeed.png", min_z=None,
-                         max_z=None, xlim=None, ylim=None, save_plot=save_plots)
+                         max_z=None, xlim=None, ylim=None, cbar_label="[m/s]", save_plot=save_plots)
 
-    title_str = r"flight compensation, counts"
+    title_str = r"Birds flight compensation counts"
     plot_averages_pcolor(x=unique_dev_mig_bins, y=unique_height_bins, z=height_dev_grid['airspeed_birds_count'],
                          cmap='RdYlBu',
                          xlab=r'$\alpha_{w} - \alpha_{mig} [^\circ$]', ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="flight_comp_counts.png", min_z=None,
-                         max_z=None, xlim=None, ylim=None, save_plot=save_plots)
+                         max_z=None, xlim=None, ylim=None, cbar_label="[no units]", save_plot=save_plots)
     ####################################################################################################################
 
     # Plot: insect prop vs time of day vs height
@@ -702,37 +710,28 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         uniqueY=unique_height_bins)
 
     # Plot: Averaged insect profile
-    title_str = "Averaged insect profile relative to biological echoes"
+    title_str = "Averaged % insects relative to biological echoes"
     plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins, z=np.transpose(height_time_grid['insect_prop_bio']),
                          cmap='jet',
                          xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="averaged_insect_prop_height_timeday.png", min_z=0,
-                         max_z=100, xlim=(0, 24), ylim=(0, 1000), save_plot=save_plots)
+                         max_z=100, xlim=(0, 24), ylim=(0, 1000), cbar_label="[%]", save_plot=save_plots)
 
-    # Plot: averaged number of birds, insects x height x time
-    fig, ax = plt.subplots(1, 2, figsize=(6.4 * 1.5, 4.8))
-    cax = ax[0].pcolor(time_hr_bins, unique_height_bins, np.transpose(height_time_grid['num_birds_height']),
-                       cmap='RdYlBu', vmin=0, vmax=1)
-    ax[0].set_xlim(0, 24)
-    ax[0].set_ylim(0, 1000)
-    ax[0].set_xlabel('Time [UTC]')
-    ax[0].set_ylabel('Height [m]')
-    ax[0].set_title("num_birds")
+    # Plot: Averaged bird population
+    title_str = "Averaged birds population"
+    plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins, z=np.transpose(height_time_grid['num_birds_height']),
+                         cmap='RdYlBu',
+                         xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="averaged_birds_population_height_timeday.png", min_z=0,
+                         max_z=1, xlim=(0, 24), ylim=(0, 1000), cbar_label="[no units]", save_plot=save_plots)
 
-    cax = ax[1].pcolor(time_hr_bins, unique_height_bins, np.transpose(height_time_grid['num_insects_height']),
-                       cmap='RdYlBu', vmin=0, vmax=1)
-    cbar = fig.colorbar(cax)
-    ax[1].set_xlim(0, 24)
-    ax[1].set_ylim(0, 1000)
-    ax[1].set_xlabel('Time [UTC]')
-    ax[1].set_ylabel('Height [m]')
-    ax[1].set_title("num_insects")
-    plt.tight_layout()
-
-    if save_plots:
-        plt.savefig(
-            os.path.join(figure_summary_dir, "averaged_bird_insect_population_height_timeday.png"),
-            dpi=200)
+    # Plot: Averaged bird population
+    title_str = "Averaged insects population."
+    plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins, z=np.transpose(height_time_grid['num_insects_height']),
+                         cmap='RdYlBu',
+                         xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="averaged_insects_population_height_timeday.png", min_z=0,
+                         max_z=1, xlim=(0, 24), ylim=(0, 1000), cbar_label="[no units]", save_plot=save_plots)
 
     ####################################################################################################################
     # Plot: Averaged flight vel x time x height. Direction is the absolute offset from the wind.
@@ -742,11 +741,11 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     plot_averages_pcolor_with_vector_field(x=time_hr_bins, y=unique_height_bins,
                                            z=np.transpose(height_time_grid['airspeed_biological']), cmap='jet',
                                            xlab='Time [UTC]',
-                                           ylab='Height [m]', title_str="Flight vel, bio", out_dir=figure_summary_dir,
+                                           ylab='Height [m]', title_str="$bias_{bio}$", out_dir=figure_summary_dir,
                                            out_name="averaged_flightvel_height_timeday.png", min_z=None, max_z=None,
                                            vec_df=height_time_grouped, x_col="time_hour_bins", y_col="height_bins",
                                            u_col="abs_bio_off_U", v_col="abs_bio_off_V", xlim=(0, 24), ylim=(0, 1000),
-                                           plot_txt=None,
+                                           plot_txt=None, cbar_label="[m/s]",
                                            save_plot=save_plots)
     ####################################################################################################################
 
@@ -791,7 +790,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
             uniqueY=unique_height_bins)
 
         # Plot for number of birds gates
-        title_str = "Number of range gates containing birds"
+        title_str = "Birds population"
         plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
                              xtick_labs=xlabels,
                              key_col='num_birds_height', x=unique_time_week, y=unique_height_bins,
@@ -799,10 +798,10 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                              title_str=title_str, out_dir=figure_summary_dir,
                              out_name="bird_population_height_timeweek.png",
                              xlim=None,
-                             ylim=(0, 1000), save_plot=save_plots)
+                             ylim=(0, 1000), cbar_label="[no units]", save_plot=save_plots)
 
         # Plot for number of insect gates
-        title_str = "Number of range gates containing insects"
+        title_str = "Insects population"
         plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
                              xtick_labs=xlabels,
                              key_col='num_insects_height', x=unique_time_week, y=unique_height_bins,
@@ -810,10 +809,10 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                              title_str=title_str, out_dir=figure_summary_dir,
                              out_name="insect_population_height_timeweek.png",
                              xlim=None,
-                             ylim=(0, 1000), save_plot=save_plots)
+                             ylim=(0, 1000), cbar_label="[no units]", save_plot=save_plots)
 
         # Plot for insect_prop_bio
-        title_str = "Relative proportion of insects"
+        title_str = "% insects relative to biological echoes"
         plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
                              xtick_labs=xlabels,
                              key_col='insect_prop_bio', x=unique_time_week, y=unique_height_bins,
@@ -821,10 +820,10 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                              title_str=title_str, out_dir=figure_summary_dir,
                              out_name="insect_prop_bio_height_timeweek.png",
                              xlim=None,
-                             ylim=(0, 1000), save_plot=save_plots)
+                             ylim=(0, 1000), cbar_label="[%]", save_plot=save_plots)
 
         # Plot for airspeed_bio height profile for whole month.
-        title_str = "Airspeed of biological echoes"
+        title_str = "Biases from biological echoes"
         plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
                              xtick_labs=xlabels,
                              key_col='airspeed_biological', x=unique_time_week, y=unique_height_bins,
@@ -832,8 +831,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                              title_str=title_str, out_dir=figure_summary_dir,
                              out_name="airspeed_biological_height_timeweek.png",
                              xlim=None,
-                             ylim=(0, 1000), save_plot=save_plots)
-
+                             ylim=(0, 1000), cbar_label="[m/s]", save_plot=save_plots)
 
         ################################################################################################################
         # Plot for wind vec height profile for whole month.
@@ -904,7 +902,7 @@ def Main():
     figure_dir = "./figures"
     plot_title_suffix = "May 1 - 31, 2018"
     out_name_suffix = "May_1_31_2018"
-    save_plots = True
+    save_plots = True # False
     generate_weekly_month_profiles = True #False
 
     airspeed_log_dir = r'./batch_analysis_logs'
@@ -921,7 +919,7 @@ def Main():
 
     use_ins_height_profile = True
     MAX_WEATHER_PROP = 10  # 10
-    MAX_WEATHER_PROP_SCAN = 5 # 5  # 20 #15  # 20
+    MAX_WEATHER_PROP_SCAN = 5 # 5
 
     gt_wind_source = WindSource.rap_130
     wind_source_desc = GetWindSourceDescription(gt_wind_source)
