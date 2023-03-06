@@ -126,7 +126,7 @@ def plot_averages_pcolor_with_vector_field(x, y, z, cmap, xlab, ylab, title_str,
 
     fig, ax = plt.subplots()
     cax = ax.pcolor(x, y, z, vmin=min_z, vmax=max_z, cmap=cmap)
-    # ax.quiver(vec_df[x_col], vec_df[y_col], vec_df[u_col], vec_df[v_col])
+    ax.quiver(vec_df[x_col], vec_df[y_col], vec_df[u_col], vec_df[v_col])
     if plot_txt:
         ax.text(plot_txt[0], plot_txt[1], plot_txt[2])
     cbar = fig.colorbar(cax)
