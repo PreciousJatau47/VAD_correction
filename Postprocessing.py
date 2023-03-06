@@ -17,7 +17,7 @@ from PreciousFunctions import PreciousCmap
 
 font = {'family': 'DejaVu Sans',
         'weight': 'bold',
-        'size': 11}
+        'size': 12}
 plt.rc('font', **font)
 
 
@@ -126,7 +126,7 @@ def plot_averages_pcolor_with_vector_field(x, y, z, cmap, xlab, ylab, title_str,
 
     fig, ax = plt.subplots()
     cax = ax.pcolor(x, y, z, vmin=min_z, vmax=max_z, cmap=cmap)
-    ax.quiver(vec_df[x_col], vec_df[y_col], vec_df[u_col], vec_df[v_col])
+    # ax.quiver(vec_df[x_col], vec_df[y_col], vec_df[u_col], vec_df[v_col])
     if plot_txt:
         ax.text(plot_txt[0], plot_txt[1], plot_txt[2])
     cbar = fig.colorbar(cax)
@@ -514,7 +514,26 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     height_ip_df['height_bins'] = height_ip_df['height_m'] // delta_height * delta_height + delta_height / 2
     height_ip_df["insect_prop_bins"] = height_ip_df["insect_prop_bio"] // delta_insect_prop * delta_insect_prop + delta_insect_prop / 2
 
-    height_ip_df = height_ip_df.groupby(["height_bins","insect_prop_bins"], as_index=False).mean()
+    # Bias bio vs % birds scatterplot.
+    lb_height = 350
+    height_ip_df["bird_prop_bins"] = 100 - height_ip_df["insect_prop_bins"]
+    height_ip_df["bird_prop_bio"] = 100 - height_ip_df["insect_prop_bio"]
+
+    bias_df = height_ip_df.loc[height_ip_df["height_m"] > lb_height, :]
+    bias_df = height_ip_df
+
+    plt.figure(figsize=(6.4 * 1.2, 4.8 * 1.2))
+    plt.grid(True)
+    plt.scatter(bias_df['bird_prop_bio'], bias_df['airspeed_biological'], s=4, alpha=0.2)
+    plt.xlabel("Proportion of predicted birds [%]")
+    plt.ylabel("Biases from bio VAD [m/s]")
+    plt.title("Biases from bio VAD. Height > {} m".format(lb_height))
+    plt.tight_layout()
+    if save_plots:
+        plt.savefig(os.path.join(figure_summary_dir, "bias_bio_scatter.png"), dpi=200)
+    ####################################################################################################################
+
+    height_ip_df = height_ip_df.groupby(["height_bins","bird_prop_bins"], as_index=False).mean()
 
     unique_insect_prop_bins = np.arange(delta_insect_prop/2, 100, delta_insect_prop)
     unique_height_bins = np.arange(delta_height/2, 1000, delta_height)
@@ -693,6 +712,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                      ["height_bins", "time_hour_bins", "insect_prop_bio", "num_insects_height", "num_birds_height",
                       "airspeed_biological", "biological_wind_offset"]]
     height_time_df["biological_wind_offset"] = np.abs(height_time_df["biological_wind_offset"])
+    height_time_df["bird_prop_bio"] = 100 - height_time_df["insect_prop_bio"]
     height_time_grouped = height_time_df.groupby(["height_bins","time_hour_bins"], as_index=False).mean()
 
     max_num = max(np.max(height_time_grouped["num_insects_height"]), np.max(height_time_grouped["num_birds_height"]))
@@ -702,7 +722,8 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     z_dict = {'insect_prop_bio': height_time_grouped['insect_prop_bio'],
               'num_birds_height': height_time_grouped['num_birds_height'],
               'num_insects_height': height_time_grouped['num_insects_height'],
-              'airspeed_biological': height_time_grouped['airspeed_biological']}
+              'airspeed_biological': height_time_grouped['airspeed_biological'],
+              'bird_prop_bio': height_time_grouped['bird_prop_bio']}
     time_hr_bins, unique_height_bins, height_time_grid = prepare_pcolor_grid_from_series(
         height_time_grouped['time_hour_bins'],
         height_time_grouped['height_bins'],
@@ -715,6 +736,13 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                          cmap='jet',
                          xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="averaged_insect_prop_height_timeday.png", min_z=0,
+                         max_z=100, xlim=(0, 24), ylim=(0, 1000), cbar_label="[%]", save_plot=save_plots)
+
+    title_str = "Averaged proportion of predicted birds"
+    plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins, z=np.transpose(height_time_grid['bird_prop_bio']),
+                         cmap='RdYlBu',
+                         xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="averaged_bird_prop_height_timeday.png", min_z=0,
                          max_z=100, xlim=(0, 24), ylim=(0, 1000), cbar_label="[%]", save_plot=save_plots)
 
     # Plot: Averaged bird population
@@ -738,10 +766,11 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     height_time_grouped["abs_bio_off_U"], height_time_grouped["abs_bio_off_V"] = \
         Polar2CartesianComponentsDf(spd=0.5, dirn=height_time_grouped["biological_wind_offset"])
 
+    title_str = "Biases from VAD on biological echoes"
     plot_averages_pcolor_with_vector_field(x=time_hr_bins, y=unique_height_bins,
                                            z=np.transpose(height_time_grid['airspeed_biological']), cmap='jet',
                                            xlab='Time [UTC]',
-                                           ylab='Height [m]', title_str="$bias_{bio}$", out_dir=figure_summary_dir,
+                                           ylab='Height [m]', title_str=title_str, out_dir=figure_summary_dir,
                                            out_name="averaged_flightvel_height_timeday.png", min_z=None, max_z=None,
                                            vec_df=height_time_grouped, x_col="time_hour_bins", y_col="height_bins",
                                            u_col="abs_bio_off_U", v_col="abs_bio_off_V", xlim=(0, 24), ylim=(0, 1000),
