@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pickle
 
+
 def classify_echoes(X, clf_path, norm_stats_path=None):
     # TODO(pjatau) Remove hardcoded values.
     # norm_stats = {
@@ -27,3 +28,9 @@ def classify_echoes(X, clf_path, norm_stats_path=None):
     y_bi = bi_clf['model'].predict(X_bi)
 
     return y_bi
+
+def Main():
+    return
+
+if __name__ == "__main__":
+    Main()
