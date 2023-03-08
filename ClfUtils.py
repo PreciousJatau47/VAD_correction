@@ -26,11 +26,14 @@ def classify_echoes(X, clf_path, norm_stats_path=None):
     X_bi = X_bi.div(norm_stats['standard deviation'], axis=1)
     X_bi = np.array(X_bi)
     y_bi = bi_clf['model'].predict(X_bi)
+    y_probs = bi_clf['model'].predict_proba(X_bi)
 
-    return y_bi
+    return y_bi, y_probs
+
 
 def Main():
     return
+
 
 if __name__ == "__main__":
     Main()

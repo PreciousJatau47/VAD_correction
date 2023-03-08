@@ -94,7 +94,9 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
         X_biw.rename(columns={"differential_phase": "pdp"}, inplace=True)
         X_biw.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
         data_table['BIWClass'] = -1
-        data_table.loc[:, 'BIWClass'] = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
+        biw_class, _ = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
+        data_table.loc[:, 'BIWClass'] = biw_class
+        # data_table.loc[:, 'BIWClass'] = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
 
         # Correct HCA's misclassification of birds as weather within VAD region.
         # if weather hca, and non-weather biw, and within collection region, set to biological
@@ -119,9 +121,12 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
     X.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
     X.rename(columns={"differential_phase": "pdp"}, inplace=True)
     X.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
-    data_table['BIClass'] = -1
+    data_table['BIClass'], data_table['BIProb'] = -1, -1
     if not X.empty:
-        data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file, norm_stats_file)
+        bi_class, bi_probs = classify_echoes(X, clf_file, norm_stats_file)
+        data_table.loc[echo_mask, 'BIClass'] = bi_class
+        data_table.loc[echo_mask, 'BIProb'] = bi_probs[:,1]
+
 
     return data_table, radar_obj, hca_vol
 
