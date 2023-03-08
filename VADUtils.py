@@ -11,16 +11,16 @@ from WindUtils import Polar2CartesianComponentsDf, Cartesian2PolarComponentsDf
 MIN_FRACTION_SAMPLES_REQUIRED = 1.5
 
 
-def GetVADMask(data_table, echo_type):
+def GetVADMask(data_table, echo_type, tail_threshold = 0.5):
     if echo_type == VADMask.biological:
         vad_mask_arr = np.logical_and(data_table["hca_bio"], data_table["mask_velocity"])
     elif echo_type == VADMask.insects:
         vad_mask_arr = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
-        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["BIClass"] == 0)
+        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["BIProb"] < tail_threshold)
         vad_mask_arr = np.logical_and(vad_mask_arr, data_table["mask_velocity"])
     elif echo_type == VADMask.birds:
         vad_mask_arr = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
-        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["BIClass"] == 1)
+        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["BIProb"] >= (1 - tail_threshold))
         vad_mask_arr = np.logical_and(vad_mask_arr, data_table["mask_velocity"])
     elif echo_type == VADMask.weather:
         vad_mask_arr = np.logical_and(data_table["hca_weather"], data_table["mask_velocity"])
@@ -120,6 +120,10 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
     :return:
     """
     vad_mask = GetVADMask(radar_sp_table, echo_type)
+
+    predClass = radar_sp_table['BIProb'] >= 0.5
+    tClass = radar_sp_table['BIClass'] == 1
+    assert np.logical_and.reduce(predClass == tClass)
 
     wind_profile_vad = []
     for height_vad in vad_ranges:
