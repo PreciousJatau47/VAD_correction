@@ -29,7 +29,7 @@ def GetVADMask(data_table, echo_type, tail_threshold = 0.5):
     return vad_mask_arr
 
 
-def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description):
+def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights = 1):
     """
     :param pred_var: Should have shape (N,).
     :param resp_var: Should have shape (N,).
@@ -41,13 +41,14 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description):
         return np.nan, np.nan, None
 
     # Cost function.
-    cost_func = lambda x: x[0] * np.sin(2 * np.pi * (1 / 360) * pred_var + x[1]) - resp_var
+    cost_func = lambda x: (x[0] * np.sin(2 * np.pi * (1 / 360) * pred_var + x[1]) - resp_var) * weights
     x0 = [random.uniform(0, 20), random.uniform(0, 2 * np.pi)]
 
     # Minimize cost function.
     x_hat = least_squares(cost_func, x0)
     soln = x_hat.x
     optimized_signal = signal_func(x_hat.x, pred_var)
+    residue = resp_var - optimized_signal
 
     # Find the direction that maximizes the wind.
     wind_cost_func = lambda phi: -soln[0] * np.sin(2 * np.pi * (1 / 360) * phi + soln[1])
@@ -60,17 +61,28 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description):
     if showDebugPlot:
         print("estimated wind speed :", wind_speed, "mps.\nDirection: ", wind_dir, " degrees.")
 
-        fig, ax = plt.subplots(1,2, figsize = (8.0,6.4))
-        ax[0].plot(pred_var, resp_var, label="data", color="blue")
-        ax[0].plot(pred_var, optimized_signal, label="VAD fit", color="red", alpha=1.0)
-        ax[0].set_title("VAD fit")
-        ax[0].legend()
+        fig, ax = plt.subplots(2,2, figsize = (8.0,6.4))
+        ax[0,0].plot(pred_var, resp_var, label="data", color="blue")
+        ax[0,0].plot(pred_var, optimized_signal, label="VAD fit", color="red", alpha=1.0)
+        ax[0, 0].set_xlabel("Azimuth ($^{\circ}$)")
+        ax[0, 0].set_ylabel("Velocity (mps)")
+        ax[0,0].set_title("VAD fit")
+        ax[0,0].legend()
 
-        ax[1].hist(pred_var, bins = 4)
-        ax[1].set_title("Azimuth distribution.")
-        ax[1].set_xlabel("Azimuth [$^{\circ}$]")
-        ax[1].set_ylabel("Bin count")
+        ax[0,1].hist(pred_var, bins = 4)
+        ax[0,1].set_title("Azimuth distribution.")
+        ax[0,1].set_xlabel("Azimuth ($^{\circ}$)")
+        ax[0,1].set_ylabel("Bin count")
 
+        ax[1, 0].plot(pred_var, residue, c='r')
+        ax[1, 0].set_title("Residue")
+        ax[1, 0].set_xlabel("Azimuth ($^{\circ}$)")
+        ax[1,0].set_ylabel("Res (mps)")
+
+        ax[1, 1].hist(residue, bins = 50)
+        ax[1, 1].set_title("Residue")
+
+        plt.tight_layout()
         plt.suptitle(description)
         plt.show()
     return wind_speed, wind_dir, optimized_signal
