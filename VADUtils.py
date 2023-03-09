@@ -121,10 +121,6 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
     """
     vad_mask = GetVADMask(radar_sp_table, echo_type)
 
-    predClass = radar_sp_table['BIProb'] >= 0.5
-    tClass = radar_sp_table['BIClass'] == 1
-    assert np.logical_and.reduce(predClass == tClass)
-
     wind_profile_vad = []
     for height_vad in vad_ranges:
         range_diff = np.abs(radar_sp_table['height_bin_meters'] - height_vad)
@@ -152,17 +148,7 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
         if not vad_valid:
             wind_speed, wind_dir, fitted_points = np.nan, np.nan, None
 
-        # TODO(pjatau) EM
-        wind_U = wind_speed * np.sin(wind_dir * np.pi / 180)
-        wind_V = wind_speed * np.cos(wind_dir * np.pi / 180)
-
         windU, windV = Polar2CartesianComponentsDf(wind_speed, wind_dir)
-
-        # TODO(pjatau) EM
-        if np.isfinite(wind_U):
-            assert round(wind_U,2) == round(windU,2)
-            assert round(wind_V,2) == round(windV,2)
-
         wind_profile_vad.append([wind_speed, wind_dir, windU, windV, height_vad, len(velocity_cut), mean_ref])
 
     wind_profile_vad = pd.DataFrame(wind_profile_vad,
