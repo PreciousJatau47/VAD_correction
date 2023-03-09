@@ -9,9 +9,10 @@ from VADMaskEnum import *
 from WindUtils import Polar2CartesianComponentsDf, Cartesian2PolarComponentsDf
 
 MIN_FRACTION_SAMPLES_REQUIRED = 1.5
+signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])
 
 
-def GetVADMask(data_table, echo_type, tail_threshold = 0.5):
+def GetVADMask(data_table, echo_type, tail_threshold=0.5):
     if echo_type == VADMask.biological:
         vad_mask_arr = np.logical_and(data_table["hca_bio"], data_table["mask_velocity"])
     elif echo_type == VADMask.insects:
@@ -29,7 +30,16 @@ def GetVADMask(data_table, echo_type, tail_threshold = 0.5):
     return vad_mask_arr
 
 
-def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights = 1):
+def GenerateVAD(speed, dirn, dirn_grid):
+    phase = (90 - dirn) * np.pi / 180
+    return signal_func([speed, phase], dirn_grid)
+
+
+def GenerateNoiseNormal(mu=0, sdev=1, num_samples=100):
+    return sdev * np.random.randn(num_samples) + mu
+
+
+def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights=1):
     """
     :param pred_var: Should have shape (N,).
     :param resp_var: Should have shape (N,).
@@ -61,26 +71,28 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights 
     if showDebugPlot:
         print("estimated wind speed :", wind_speed, "mps.\nDirection: ", wind_dir, " degrees.")
 
-        fig, ax = plt.subplots(2,2, figsize = (8.0,6.4))
-        ax[0,0].plot(pred_var, resp_var, label="data", color="blue")
-        ax[0,0].plot(pred_var, optimized_signal, label="VAD fit", color="red", alpha=1.0)
+        fig, ax = plt.subplots(2, 2, figsize=(8.0, 6.4))
+        ax[0, 0].plot(pred_var, resp_var, label="data", color="blue")
+        ax[0, 0].plot(pred_var, optimized_signal, label="VAD fit", color="red", alpha=1.0)
         ax[0, 0].set_xlabel("Azimuth ($^{\circ}$)")
         ax[0, 0].set_ylabel("Velocity (mps)")
-        ax[0,0].set_title("VAD fit")
-        ax[0,0].legend()
+        ax[0, 0].set_title("VAD fit")
+        ax[0, 0].legend()
 
-        ax[0,1].hist(pred_var, bins = 4)
-        ax[0,1].set_title("Azimuth distribution.")
-        ax[0,1].set_xlabel("Azimuth ($^{\circ}$)")
-        ax[0,1].set_ylabel("Bin count")
+        ax[0, 1].hist(pred_var, bins=4)
+        ax[0, 1].set_title("Azimuth distribution.")
+        ax[0, 1].set_xlabel("Azimuth ($^{\circ}$)")
+        ax[0, 1].set_ylabel("Bin count (no unit)")
 
         ax[1, 0].plot(pred_var, residue, c='r')
         ax[1, 0].set_title("Residue")
         ax[1, 0].set_xlabel("Azimuth ($^{\circ}$)")
-        ax[1,0].set_ylabel("Res (mps)")
+        ax[1, 0].set_ylabel("Res (mps)")
 
-        ax[1, 1].hist(residue, bins = 50)
+        ax[1, 1].hist(residue, bins=50)
         ax[1, 1].set_title("Residue")
+        ax[1, 1].set_xlabel("Residue (mps)")
+        ax[1, 1].set_ylabel("Bin count (no unit)")
 
         plt.tight_layout()
         plt.suptitle(description)
@@ -97,7 +109,7 @@ def IsVADDistributionValid(az_cut, wind_dir, echo_type):
     az_bins_id = np.unique(az_cut_bins)
     az_bins_id = az_bins_id.astype('int32')
 
-    az_dist = np.zeros((360//az_bin_size,))
+    az_dist = np.zeros((360 // az_bin_size,))
     for bin_idx in az_bins_id:
         az_dist[bin_idx] = np.sum(az_cut_bins == bin_idx)
     az_dist /= max(az_dist)
@@ -153,7 +165,7 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
         wind_speed, wind_dir, fitted_points = fitVAD(az_cut, velocity_cut, signal_func, showDebugPlot, description)
 
         if math.isnan(wind_dir):
-            vad_valid =  False
+            vad_valid = False
         else:
             vad_valid = IsVADDistributionValid(az_cut, wind_dir, echo_type)
 
@@ -165,11 +177,11 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
 
     wind_profile_vad = pd.DataFrame(wind_profile_vad,
                                     columns=["wind_speed", "wind_direction", "wind_U", "wind_V", "height",
-                                             "num_samples","mean_ref"])
+                                             "num_samples", "mean_ref"])
     wind_profile_vad = wind_profile_vad.drop_duplicates(subset='height', keep='last', ignore_index=True)
 
     tmp = False
-    if tmp:    # TODO remove or define proper flag.
+    if tmp:  # TODO remove or define proper flag.
         plt.figure()
         plt.plot(wind_profile_vad['wind_U'], wind_profile_vad['height'], color='blue', label="windU")
         plt.plot(wind_profile_vad['wind_V'], wind_profile_vad['height'], color='red', label="windV")
@@ -195,18 +207,16 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
 def Main():
     showDebugPlot = True
     N = 720 * round(MIN_FRACTION_SAMPLES_REQUIRED)
-    # t = np.arange(0, 360)
     t = np.linspace(0, 360, N)
 
-    x = [random.uniform(0, 20), random.uniform(0, 2 * np.pi)]
-    true_wind_speed = x[0]
-    true_wind_dir = np.rad2deg(np.pi / 2 - x[1]) % 360
+    true_wind_speed = random.uniform(0, 20)
+    true_wind_dir = random.uniform(0, 360)
     print("true wind speed :", true_wind_speed, "mps.\nDirection: ", true_wind_dir, " degrees.")
 
-    signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])
-    data = signal_func(x, t) + random.uniform(0, 2) * np.random.randn(N)
+    data = GenerateVAD(speed=true_wind_speed, dirn=true_wind_dir, dirn_grid=t) + GenerateNoiseNormal(num_samples=N)
 
     wind_speed, wind_dir, vad_fit = fitVAD(t, data, signal_func, showDebugPlot, description='')
+
 
 if __name__ == "__main__":
     Main()
