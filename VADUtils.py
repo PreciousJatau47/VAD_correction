@@ -38,6 +38,40 @@ def GenerateVAD(speed, dirn, dirn_grid):
 def GenerateNoiseNormal(mu=0, sdev=1, num_samples=100):
     return sdev * np.random.randn(num_samples) + mu
 
+def MixVADs(vad_main, vad_sec, a,mix_r):
+    """
+    Mix two VADs according to the distribution specified by a and mix_r.
+    :param vad_main:
+    :param vad_sec:
+    :param a: the proportion of the mixed vad that contain pure samples from vad_main
+    :param mix_r: the proportion of the mixed vad that contains an average between vad_main and vad_sec
+    :return:
+    """
+    assert a + mix_r <= 1
+    N = len(vad_main)
+    num_mix = int(mix_r * N)
+    num_a = int(a * N)
+
+    # Partition indices.
+    idxs = [i for i in range(N)]
+    mix_idxs = np.random.choice(a=idxs, size=num_mix, replace=False)
+    rem_idxs_set = set(idxs) - set(mix_idxs)
+    rem_idxs = list(rem_idxs_set)
+    a_idxs = np.random.choice(a=rem_idxs, size=num_a, replace=False)
+    b_idxs = list(rem_idxs_set - set(a_idxs))
+
+    # Mix VADs
+    vad_mix = vad_main.copy()
+    vad_mix[b_idxs] = vad_sec[b_idxs]
+    weights_mix = np.random.rand(num_mix, )
+    vad_mix[mix_idxs] = weights_mix * vad_mix[mix_idxs] + (1 - weights_mix) * vad_sec[mix_idxs]
+
+    # Probabilies. Gives the proportion of vad_main at some point i
+    is_main_vad = np.ones((N,))
+    is_main_vad[b_idxs] = 0
+    is_main_vad[mix_idxs] = weights_mix
+
+    return vad_mix, is_main_vad, a_idxs, mix_idxs, b_idxs, weights_mix
 
 def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights=1):
     """
