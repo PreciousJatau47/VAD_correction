@@ -328,7 +328,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                 l3_filelist=None, vad_debug_params=None, ground_truth_source=WindSource.sounding, rap_folder=None,
                 log_dir_rap='./atmospheric_model_data/UV_wind_logs',
                 log_file_base_rap='{}_windcomponents_lat_{}_lon_{}.pkl', correct_hca_weather=True,
-                biw_norm_stats_file=None, biw_clf_file=None, allowed_el_hca = None):
+                biw_norm_stats_file=None, biw_clf_file=None, allowed_el_hca=None, use_vad_weights=False):
     radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
     radar_name, year, month, day, hh, mm, ss = read_info_from_radar_name(radar_data_file)
 
@@ -472,7 +472,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     vad_profiles_job = {}
     for vad_mask in vad_jobs:
         wind_profile_vad = VADWindProfile(signal_func, vad_heights, vad_mask, data_table,
-                                          showDebugPlot=show_vad_plot)
+                                          showDebugPlot=show_vad_plot, use_weights=use_vad_weights)
         vad_profiles_job[vad_mask] = wind_profile_vad
 
     # Interpolate wind components.

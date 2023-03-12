@@ -118,6 +118,44 @@ class TestVADUtils(unittest.TestCase):
         print(wind_dir)
         print()
 
+    def test_MinMaxNormalization(self):
+        x = np.array([0.1, 0.5, 0.9])
+        x_norm = MinMaxNormalization(x)
+        self.assertAlmostEquals(first=x_norm[0], second=(0.1 - 0.1) / .8, delta=0.005)
+        self.assertAlmostEquals(first=x_norm[1], second=(0.5 - 0.1) / .8, delta=0.005)
+        self.assertAlmostEquals(first=x_norm[2], second=(0.9 - 0.1) / .8, delta=0.005)
+
+        min_val, max_val = -5, 10
+        x = np.array([i for i in range(min_val, max_val + 1)])
+        x_norm = MinMaxNormalization(x)
+        self.assertTrue(np.min(x_norm) >= 0)
+        self.assertTrue(np.max(x_norm) <= 1)
+
+    def test_GetVADWeights(self):
+        # Birds
+        bi_score = np.array([0.6, 0.7, 0.99])
+        exp_score = (bi_score - 0.5) / (0.99 - 0.5)
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.birds)
+        self.assertTrue(np.logical_and.reduce(np.isclose(a=exp_score, b=pred_score, atol=0.1, rtol=0.1)))
+
+        # Insects
+        bi_score = np.array([0.4, 0.3, 0.01])
+        bi_score_inv = 1 - bi_score
+        exp_score = (bi_score_inv - 0.5) / (0.99 - 0.5)
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.insects)
+        self.assertTrue(np.logical_and.reduce(np.isclose(a=exp_score, b=pred_score, atol=0.1, rtol=0.1)))
+
+        # Biological
+        bi_score = np.array([0.5, 0.3, 0.01])
+        bi_score_inv = 1 - bi_score
+        exp_score = (bi_score_inv - 0) / (1 - 0)
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.biological)
+        self.assertTrue(np.logical_and.reduce(np.isclose(a=exp_score, b=pred_score, atol=0.1, rtol=0.1)))
+
+        # Weather
+        bi_score = np.array([0.6, 0.7, 0.99])
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.weather)
+        self.assertTrue(pred_score == 1)
 
 if __name__ == "__main__":
     unittest.main()

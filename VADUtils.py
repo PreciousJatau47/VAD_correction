@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import math
+import sys
 import pickle
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -10,25 +11,8 @@ from WindUtils import Polar2CartesianComponentsDf, Cartesian2PolarComponentsDf
 
 MIN_FRACTION_SAMPLES_REQUIRED = 1.5
 signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])
-
-
-def GetVADMask(data_table, echo_type, tail_threshold=0.5):
-    if echo_type == VADMask.biological:
-        vad_mask_arr = np.logical_and(data_table["hca_bio"], data_table["mask_velocity"])
-    elif echo_type == VADMask.insects:
-        vad_mask_arr = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
-        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["BIProb"] < tail_threshold)
-        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["mask_velocity"])
-    elif echo_type == VADMask.birds:
-        vad_mask_arr = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
-        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["BIProb"] >= (1 - tail_threshold))
-        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["mask_velocity"])
-    elif echo_type == VADMask.weather:
-        vad_mask_arr = np.logical_and(data_table["hca_weather"], data_table["mask_velocity"])
-    else:
-        vad_mask_arr = data_table["mask_velocity"]
-    return vad_mask_arr
-
+MAX_INT = sys.maxsize
+MIN_INT = -sys.maxsize
 
 def GenerateVAD(speed, dirn, dirn_grid):
     phase = (90 - dirn) * np.pi / 180
@@ -38,7 +22,8 @@ def GenerateVAD(speed, dirn, dirn_grid):
 def GenerateNoiseNormal(mu=0, sdev=1, num_samples=100):
     return sdev * np.random.randn(num_samples) + mu
 
-def MixVADs(vad_main, vad_sec, a,mix_r):
+
+def MixVADs(vad_main, vad_sec, a, mix_r):
     """
     Mix two VADs according to the distribution specified by a and mix_r.
     :param vad_main:
@@ -72,6 +57,7 @@ def MixVADs(vad_main, vad_sec, a,mix_r):
     is_main_vad[mix_idxs] = weights_mix
 
     return vad_mix, is_main_vad, a_idxs, mix_idxs, b_idxs, weights_mix
+
 
 def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights=1):
     """
@@ -170,7 +156,41 @@ def IsVADDistributionValid(az_cut, wind_dir, echo_type):
     return vad_valid_status
 
 
-def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebugPlot):
+def GetVADMask(data_table, echo_type, tail_threshold=0.5):
+    if echo_type == VADMask.biological:
+        vad_mask_arr = np.logical_and(data_table["hca_bio"], data_table["mask_velocity"])
+    elif echo_type == VADMask.insects:
+        vad_mask_arr = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
+        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["BIProb"] < tail_threshold)
+        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["mask_velocity"])
+    elif echo_type == VADMask.birds:
+        vad_mask_arr = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
+        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["BIProb"] >= (1 - tail_threshold))
+        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["mask_velocity"])
+    elif echo_type == VADMask.weather:
+        vad_mask_arr = np.logical_and(data_table["hca_weather"], data_table["mask_velocity"])
+    else:
+        vad_mask_arr = data_table["mask_velocity"]
+    return vad_mask_arr
+
+
+def MinMaxNormalization(x, min_guard=MAX_INT, max_guard=MIN_INT):
+    x_min = min(min_guard, np.nanmin(x))
+    x_max = max(max_guard, np.nanmax(x))
+    return (x - x_min) / (x_max - x_min)
+
+def GetVADWeights(bi_scores_cut, echo_type):
+    if echo_type == VADMask.birds:
+        return MinMaxNormalization(x=bi_scores_cut, min_guard=0.5, max_guard=1)
+    if echo_type == VADMask.insects:
+        return MinMaxNormalization(x=1 - bi_scores_cut, min_guard=0.5, max_guard=1)
+    if echo_type == VADMask.biological:
+        return MinMaxNormalization(x=1 - bi_scores_cut, min_guard=0, max_guard=1)
+    if echo_type == VADMask.weather:
+        return 1
+    return None
+
+def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebugPlot, use_weights=False):
     """
     :param signal_func:
     :param vad_ranges:
@@ -189,6 +209,11 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
         idx_cut = np.logical_and(idx_cut, vad_mask)
         velocity_cut = radar_sp_table['velocity'][idx_cut]
         az_cut = radar_sp_table['azimuth'][idx_cut]
+        weights_cut = 1
+
+        if use_weights:
+            bi_scores_cut = radar_sp_table['BIProb'][idx_cut]
+            weights_cut = GetVADWeights(bi_scores_cut=bi_scores_cut,echo_type=echo_type)
 
         # Mean reflectivity per height bin.
         # TODO use reflectivity mask.
@@ -196,7 +221,8 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
         mean_ref = np.mean(radar_sp_table['reflectivity'][idx_ref])
 
         description = "{}, {}m".format(GetVADMaskDescription(echo_type), height_vad)
-        wind_speed, wind_dir, fitted_points = fitVAD(az_cut, velocity_cut, signal_func, showDebugPlot, description)
+        wind_speed, wind_dir, fitted_points = fitVAD(az_cut, velocity_cut, signal_func, showDebugPlot, description,
+                                                     weights=weights_cut)
 
         if math.isnan(wind_dir):
             vad_valid = False

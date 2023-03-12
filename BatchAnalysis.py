@@ -147,7 +147,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                     force_output_logging,
                     ground_truth_source=WindSource.sounding,
                     rap_folder=None, correct_hca_weather=False, biw_norm_stats_file=None,
-                    biw_clf_file=None, log_dir='./', experiment_name='', allowed_el_hca = None):
+                    biw_clf_file=None, log_dir='./', experiment_name='', allowed_el_hca=None, use_vad_weights=False):
     # Echo count options
     echo_count_log_dir = os.path.join(echo_count_log_dir, batch_folder)
     if correct_hca_weather:
@@ -332,7 +332,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                                            rap_folder=rap_folder,
                                                                            correct_hca_weather=correct_hca_weather,
                                                                            biw_norm_stats_file=biw_norm_stats_file,
-                                                                           biw_clf_file=biw_clf_file)
+                                                                           biw_clf_file=biw_clf_file,
+                                                                           use_vad_weights=use_vad_weights)
 
                     # Initialize accumulator for VAD profiles.
                     if vad_profiles_accumm is None:
@@ -681,12 +682,12 @@ def Main():
     force_output_logging = True
     output_log_dir = "./analysis_output_logs"
     figure_dir = './figures'
-    save_ppi_plots = True
+    save_ppi_plots = False
 
-    batch_folder = "KOHX_20180516_20180531" #"KOHX_20180501_20180515" #"KOHX_20180516_20180531" # 'KLVX_20180501_20180531' #'KHTX_20180501_20180531' #"KOHX_20180516_20180531" #  # "KOHX_20180516_20180531"
+    batch_folder = "KOHX_20180503_test_data" #"KOHX_20180516_20180531" #"KOHX_20180501_20180515" #"KOHX_20180516_20180531" # 'KLVX_20180501_20180531' #'KHTX_20180501_20180531' #"KOHX_20180516_20180531" #  # "KOHX_20180516_20180531"
     # date_pattern = "*KENX201804{}*_V06.*"
-    start_day = 16
-    stop_day = 31
+    start_day = 3 #16
+    stop_day = 3 #31
     max_range = 400  # in km.
     max_height_VAD = 1000  # in m.
 
@@ -710,6 +711,7 @@ def Main():
     rap_folder = r"./atmospheric_model_data/rap_130_20180501_20180531"
 
     # VAD
+    use_vad_weights = True
     vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather, VADMask.biological]
     delta_time_hr = 2 * 60 / 60
     time_window = {'noon': (12 - delta_time_hr, 12 + delta_time_hr),
@@ -741,7 +743,7 @@ def Main():
                     ground_truth_source=ground_truth_wind, rap_folder=rap_folder,
                     correct_hca_weather=correct_hca_weather,
                     biw_norm_stats_file=biw_norm_stats_file, biw_clf_file=biw_clf_file, log_dir=e2e_analysis_log_dir,
-                    experiment_name='', allowed_el_hca=allowed_el_hca)
+                    experiment_name='', allowed_el_hca=allowed_el_hca, use_vad_weights=use_vad_weights)
 
 
 Main()
