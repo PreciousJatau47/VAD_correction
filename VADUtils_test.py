@@ -121,9 +121,9 @@ class TestVADUtils(unittest.TestCase):
     def test_MinMaxNormalization(self):
         x = np.array([0.1, 0.5, 0.9])
         x_norm = MinMaxNormalization(x)
-        self.assertAlmostEquals(first=x_norm[0], second=(0.1 - 0.1) / .8, delta=0.005)
-        self.assertAlmostEquals(first=x_norm[1], second=(0.5 - 0.1) / .8, delta=0.005)
-        self.assertAlmostEquals(first=x_norm[2], second=(0.9 - 0.1) / .8, delta=0.005)
+        self.assertAlmostEqual(first=x_norm[0], second=(0.1 - 0.1) / .8, delta=0.005)
+        self.assertAlmostEqual(first=x_norm[1], second=(0.5 - 0.1) / .8, delta=0.005)
+        self.assertAlmostEqual(first=x_norm[2], second=(0.9 - 0.1) / .8, delta=0.005)
 
         min_val, max_val = -5, 10
         x = np.array([i for i in range(min_val, max_val + 1)])

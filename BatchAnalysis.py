@@ -147,7 +147,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                     force_output_logging,
                     ground_truth_source=WindSource.sounding,
                     rap_folder=None, correct_hca_weather=False, biw_norm_stats_file=None,
-                    biw_clf_file=None, log_dir='./', experiment_name='', allowed_el_hca=None, use_vad_weights=False):
+                    biw_clf_file=None, log_dir='./', experiment_name='', allowed_el_hca=None, use_vad_weights=False,
+                    clf_purity_threshold=0.5):
     # Echo count options
     echo_count_log_dir = os.path.join(echo_count_log_dir, batch_folder)
     if correct_hca_weather:
@@ -333,7 +334,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                                            correct_hca_weather=correct_hca_weather,
                                                                            biw_norm_stats_file=biw_norm_stats_file,
                                                                            biw_clf_file=biw_clf_file,
-                                                                           use_vad_weights=use_vad_weights)
+                                                                           use_vad_weights=use_vad_weights,
+                                                                           clf_purity_threshold=clf_purity_threshold)
 
                     # Initialize accumulator for VAD profiles.
                     if vad_profiles_accumm is None:
@@ -438,8 +440,10 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
 
         # Save wind error everyday.
         # TODO(pjatau) define a proper experiment name
-        log_path = os.path.join(experiment_dir, ''.join([batch_folder, '.pkl']))
-        log_path_averaged = os.path.join(experiment_dir, ''.join([batch_folder, '_averaged_', str(delta_time), '.pkl']))
+        log_suffix = '_weights_{}_threshold_{}'.format(int(use_vad_weights), int(clf_purity_threshold * 100))
+        log_path = os.path.join(experiment_dir, ''.join([batch_folder, log_suffix, '.pkl']))
+        log_path_averaged = os.path.join(experiment_dir,
+                                         ''.join([batch_folder, log_suffix, '_averaged_', str(delta_time), '.pkl']))
 
         # Save(update) wind error results on a daily basis
         if curr_day == first_day:  # First data set to be logged
@@ -711,8 +715,9 @@ def Main():
     rap_folder = r"./atmospheric_model_data/rap_130_20180501_20180531"
 
     # VAD
-    use_vad_weights = True
     vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather, VADMask.biological]
+    use_vad_weights = False
+    clf_purity_threshold = 0.5
     delta_time_hr = 2 * 60 / 60
     time_window = {'noon': (12 - delta_time_hr, 12 + delta_time_hr),
                    'midnight': (24 - delta_time_hr, (24 + delta_time_hr) % 24)}
@@ -743,7 +748,8 @@ def Main():
                     ground_truth_source=ground_truth_wind, rap_folder=rap_folder,
                     correct_hca_weather=correct_hca_weather,
                     biw_norm_stats_file=biw_norm_stats_file, biw_clf_file=biw_clf_file, log_dir=e2e_analysis_log_dir,
-                    experiment_name='', allowed_el_hca=allowed_el_hca, use_vad_weights=use_vad_weights)
+                    experiment_name='', allowed_el_hca=allowed_el_hca, use_vad_weights=use_vad_weights,
+                    clf_purity_threshold=clf_purity_threshold)
 
 
 Main()

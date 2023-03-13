@@ -137,7 +137,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
         plt.savefig(os.path.join(output_folder,
                                  "".join([figure_prefix, "_wind_comparison_components_", figure_suffix, ".png"])),
                     dpi=200)
-    plt.show()
+    # plt.show()
     plt.close(fig_comp)
     plt.close('all')
 
@@ -328,7 +328,8 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                 l3_filelist=None, vad_debug_params=None, ground_truth_source=WindSource.sounding, rap_folder=None,
                 log_dir_rap='./atmospheric_model_data/UV_wind_logs',
                 log_file_base_rap='{}_windcomponents_lat_{}_lon_{}.pkl', correct_hca_weather=True,
-                biw_norm_stats_file=None, biw_clf_file=None, allowed_el_hca=None, use_vad_weights=False):
+                biw_norm_stats_file=None, biw_clf_file=None, allowed_el_hca=None, use_vad_weights=False,
+                clf_purity_threshold=0.5):
     radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
     radar_name, year, month, day, hh, mm, ss = read_info_from_radar_name(radar_data_file)
 
@@ -472,7 +473,8 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     vad_profiles_job = {}
     for vad_mask in vad_jobs:
         wind_profile_vad = VADWindProfile(signal_func, vad_heights, vad_mask, data_table,
-                                          showDebugPlot=show_vad_plot, use_weights=use_vad_weights)
+                                          showDebugPlot=show_vad_plot, use_weights=use_vad_weights,
+                                          clf_purity_threshold=clf_purity_threshold)
         vad_profiles_job[vad_mask] = wind_profile_vad
 
     # Interpolate wind components.
