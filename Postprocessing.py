@@ -237,6 +237,55 @@ def plot_weekly_averages_with_vector_field(weekly_data, day_starts, noon_s_midni
     return
 
 
+def LoadWindError(airspeed_log_dir, airspeed_files, target_echoes, use_ins_height_profile, MAX_WEATHER_PROP,
+                  MAX_WEATHER_PROP_SCAN, remove_cases_list = []):
+    wind_error = pd.DataFrame()
+    for airspeed_file in airspeed_files:
+        wind_error_path = os.path.join(airspeed_log_dir, airspeed_file)
+        p_in = open(wind_error_path, 'rb')
+        curr_wind_error, idx_last_log = pickle.load(p_in)
+        p_in.close()
+        wind_error = wind_error.append(curr_wind_error)
+
+    if 'airspeed_birds' not in wind_error.columns:
+        for echo in target_echoes:
+            airspeed_fname = 'airspeed_{}'.format(GetVADMaskDescription(echo))
+            fdirn_fname = 'fdirn_{}'.format(GetVADMaskDescription(echo))
+            migspeed_fname = '{}_speed'.format(GetVADMaskDescription(echo))
+            migdirn_fname = '{}_direction'.format(GetVADMaskDescription(echo))
+
+            # Calculate flight vector.
+            wind_error[airspeed_fname], wind_error[fdirn_fname] = CalcPolarDiffVec(
+                spd1=wind_error[migspeed_fname],
+                dirn1=wind_error[migdirn_fname],
+                spd2=wind_error['wind_speed'],
+                dirn2=wind_error[
+                    'wind_direction'])
+
+            # Direction offset from the wind.
+            wind_error['{}_wind_offset'.format(GetVADMaskDescription(echo))] = CalcSmallAngleDirDiffDf(
+                wind_error['{}_direction'.format(
+                    GetVADMaskDescription(echo))], wind_error['wind_direction'])
+
+    # Calculate insect-bird height profile.
+    if use_ins_height_profile:
+        print('Using insect height profile. ')
+        if 'num_insects_height' in wind_error.columns:
+            wind_error['insect_prop_bio_height'] = 100 * wind_error['num_insects_height'] / (
+                    wind_error['num_insects_height'] + wind_error['num_birds_height'])
+            wind_error['insect_prop_bio'] = wind_error['insect_prop_bio_height']
+        else:
+            sys.exit('num_insects_height does not exist in wind_error.')
+
+    # Filter wind error data.
+    constraints = [("prop_weather", 0, MAX_WEATHER_PROP), ("prop_weather_scan", 0, MAX_WEATHER_PROP_SCAN),
+                   ('file_name', remove_cases_list)]
+    idx_constraints = ImposeConstraints(wind_error, constraints)
+    wind_error_constrained = wind_error[idx_constraints].reset_index(drop=True)
+
+    return wind_error_constrained, constraints
+
+
 def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plots, figure_summary_dir,
                           plot_title_suffix, out_name_suffix, max_airspeed=None, show_plots=True,
                           generate_weekly_month_profiles=True):
@@ -932,64 +981,27 @@ def Main():
     use_ins_height_profile = True
     MAX_WEATHER_PROP = 10  # 10
     MAX_WEATHER_PROP_SCAN = 5 # 5
+    remove_cases_list = []
     gt_wind_source = WindSource.rap_130
     target_echoes = [VADMask.birds, VADMask.insects, VADMask.biological]
 
     figure_dir = "./figures"
     plot_title_suffix = "May 1 - 31, 2018"
     out_name_suffix = "May_1_31_2018"
-    save_plots = False # False
+    save_plots = True # False
     generate_weekly_month_profiles = True #False
 
     wind_source_desc = GetWindSourceDescription(gt_wind_source)
     wind_source_desc = wind_source_desc.replace(' ', '_')
 
     # Load wind error
-    wind_error = pd.DataFrame()
-    for airspeed_file in airspeed_files:
-        wind_error_path = os.path.join(airspeed_log_dir, airspeed_file)
-        p_in = open(wind_error_path, 'rb')
-        curr_wind_error, idx_last_log = pickle.load(p_in)
-        p_in.close()
-        wind_error = wind_error.append(curr_wind_error)
-
-    ## Preprocessing ##
-    if 'airspeed_birds' not in wind_error.columns:
-        for echo in target_echoes:
-            airspeed_fname = 'airspeed_{}'.format(GetVADMaskDescription(echo))
-            fdirn_fname = 'fdirn_{}'.format(GetVADMaskDescription(echo))
-            migspeed_fname = '{}_speed'.format(GetVADMaskDescription(echo))
-            migdirn_fname = '{}_direction'.format(GetVADMaskDescription(echo))
-
-            # Calculate flight vector.
-            wind_error[airspeed_fname], wind_error[fdirn_fname] = CalcPolarDiffVec(
-                spd1=wind_error[migspeed_fname],
-                dirn1=wind_error[migdirn_fname],
-                spd2=wind_error['wind_speed'],
-                dirn2=wind_error[
-                    'wind_direction'])
-
-            # Direction offset from the wind.
-            wind_error['{}_wind_offset'.format(GetVADMaskDescription(echo))] = CalcSmallAngleDirDiffDf(
-                wind_error['{}_direction'.format(
-                    GetVADMaskDescription(echo))], wind_error['wind_direction'])
-
-    # Calculate insect-bird height profile.
-    if use_ins_height_profile:
-        print('Using insect height profile. ')
-        if 'num_insects_height' in wind_error.columns:
-            wind_error['insect_prop_bio_height'] = 100 * wind_error['num_insects_height'] / (
-                        wind_error['num_insects_height'] + wind_error['num_birds_height'])
-            wind_error['insect_prop_bio'] = wind_error['insect_prop_bio_height']
-        else:
-            sys.exit('num_insects_height does not exist in wind_error.')
-
-    # Filter wind error data.
-    remove_cases_list = []
-    constraints = [("prop_weather", 0, MAX_WEATHER_PROP), ("prop_weather_scan", 0, MAX_WEATHER_PROP_SCAN),
-                   ('file_name', remove_cases_list)]
-    idx_constraints = ImposeConstraints(wind_error, constraints)
-    wind_error_constrained = wind_error[idx_constraints].reset_index(drop=True)
+    wind_error_constrained, constraints = LoadWindError(airspeed_log_dir=airspeed_log_dir,
+                                                        airspeed_files=airspeed_files,
+                                                        target_echoes=target_echoes,
+                                                        use_ins_height_profile=use_ins_height_profile,
+                                                        MAX_WEATHER_PROP=MAX_WEATHER_PROP,
+                                                        MAX_WEATHER_PROP_SCAN=MAX_WEATHER_PROP_SCAN,
+                                                        remove_cases_list=remove_cases_list)
 
     # Visualize flight speeds
     color_weather = wind_error_constrained['prop_weather']
