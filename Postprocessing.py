@@ -14,7 +14,6 @@ import GeneralUtils as gu
 from WindUtils import *
 from PreciousFunctions import PreciousCmap
 
-
 font = {'family': 'DejaVu Sans',
         'weight': 'bold',
         'size': 12}
@@ -921,36 +920,27 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
 def Main():
     # Inputs
-    wind_dir = './vad_sounding_comparison_logs'
-    experiment_id = "post_processing_default"  # "KENX_20180501_20180531_2hr_window"
-    correct_hca_weather = True
+    airspeed_log_dir = r'./batch_analysis_logs'
+    airspeed_files = ['debug_parameter_tuning/KOHX_20180501_20180531_weights_0_threshold_50.pkl']
+    # airspeed_files = ['KOHX_20180516_20180531_launched_202329_11/KOHX_20180516_20180531.pkl',
+    #                   'KOHX_20180501_20180515_launched_202328_19/KOHX_20180501_20180515.pkl']
+    # airspeed_files = ['KOHX_20180501_20180515_launched_2023118_16\KOHX_20180501_20180515.pkl',
+    #                   'KOHX_20180516_20180531_launched_2023119_10\KOHX_20180516_20180531.pkl']
 
-    echo_count_dir = './analysis_output_logs'
-    log_dir = "./post_processing_logs"
+    experiment_id = "post_processing_default"
+    correct_hca_weather = True
+    use_ins_height_profile = True
+    MAX_WEATHER_PROP = 10  # 10
+    MAX_WEATHER_PROP_SCAN = 5 # 5
+    gt_wind_source = WindSource.rap_130
+    target_echoes = [VADMask.birds, VADMask.insects, VADMask.biological]
 
     figure_dir = "./figures"
     plot_title_suffix = "May 1 - 31, 2018"
     out_name_suffix = "May_1_31_2018"
-    save_plots = True # False
+    save_plots = False # False
     generate_weekly_month_profiles = True #False
 
-    airspeed_log_dir = r'./batch_analysis_logs'
-    airspeed_files = ['KOHX_20180516_20180531_launched_202329_11/KOHX_20180516_20180531.pkl',
-                      'KOHX_20180501_20180515_launched_202328_19/KOHX_20180501_20180515.pkl']
-    # airspeed_files = ['KOHX_20180501_20180515_launched_2023118_16\KOHX_20180501_20180515.pkl',
-    #                   'KOHX_20180516_20180531_launched_2023119_10\KOHX_20180516_20180531.pkl']
-    # airspeed_files = [r'0_to_2pt5_el\KOHX_20180501_20180515_launched_2023121_21\KOHX_20180501_20180515.pkl',
-    #                   r'0_to_2pt5_el\KOHX_20180516_20180531_launched_2023122_16\KOHX_20180516_20180531.pkl']
-    # airspeed_files = [r'0_to_2pt5_el\KOHX_20180501_20180515_launched_2023121_21\KOHX_20180501_20180515.pkl',
-    #                   r'0_to_2pt5_el\KOHX_20180516_20180531_launched_2023122_16\KOHX_20180516_20180531.pkl']
-    # airspeed_files = [r'0_to_0pt5_el\KOHX_20180501_20180515_launched_2023124_11\KOHX_20180501_20180515.pkl',
-    #                   r'0_to_0pt5_el\KOHX_20180516_20180531_launched_2023124_19\KOHX_20180516_20180531.pkl']
-
-    use_ins_height_profile = True
-    MAX_WEATHER_PROP = 10  # 10
-    MAX_WEATHER_PROP_SCAN = 5 # 5
-
-    gt_wind_source = WindSource.rap_130
     wind_source_desc = GetWindSourceDescription(gt_wind_source)
     wind_source_desc = wind_source_desc.replace(' ', '_')
 
@@ -964,8 +954,6 @@ def Main():
         wind_error = wind_error.append(curr_wind_error)
 
     ## Preprocessing ##
-    # TODO(pjatau) Move target echoes up (?)
-    target_echoes = [VADMask.birds, VADMask.insects, VADMask.biological]
     if 'airspeed_birds' not in wind_error.columns:
         for echo in target_echoes:
             airspeed_fname = 'airspeed_{}'.format(GetVADMaskDescription(echo))
@@ -985,8 +973,6 @@ def Main():
             wind_error['{}_wind_offset'.format(GetVADMaskDescription(echo))] = CalcSmallAngleDirDiffDf(
                 wind_error['{}_direction'.format(
                     GetVADMaskDescription(echo))], wind_error['wind_direction'])
-            # wind_error['{}_wind_offset'.format(GetVADMaskDescription(echo))] = wind_error['{}_direction'.format(
-            #     GetVADMaskDescription(echo))] - wind_error['wind_direction']
 
     # Calculate insect-bird height profile.
     if use_ins_height_profile:
