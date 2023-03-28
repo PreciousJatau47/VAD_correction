@@ -591,8 +591,8 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     height_ip_df["bird_prop_bins"] = 100 - height_ip_df["insect_prop_bins"]
     height_ip_df["bird_prop_bio"] = 100 - height_ip_df["insect_prop_bio"]
 
-    bias_df = height_ip_df.loc[height_ip_df["height_m"] > lb_height, :]
-    bias_df = height_ip_df
+    # bias_df = height_ip_df.loc[height_ip_df["height_m"] > lb_height, :]
+    bias_df = height_ip_df.copy()
 
     plt.figure(figsize=(6.4 * 1.2, 4.8 * 1.2))
     plt.grid(True)
@@ -672,56 +672,6 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                          out_dir=figure_summary_dir, out_name="airspeed_ins_height_insectprop.png", min_z=0,
                          max_z=max_airspeed, xlim=(0, 100), ylim=(0, 1000), cbar_label="[m/s]",
                          save_plot=save_plots)
-
-    ####################################################################################################################
-    # Height vs wind dev. from mig dir vs airspeed
-    # TODO(pjatau) Refactor constants or delete code block
-    delta_alpha = 30
-    bird_mig_dirn = np.nanmedian(wind_error.loc[idx_all_birds, "birds_direction"])
-
-    height_wind_dev_df = wind_error[
-        ["insect_prop_bio", "airspeed_birds", "airspeed_insects", "airspeed_biological", "height_m", "wind_direction"]]
-    idx = height_wind_dev_df["insect_prop_bio"] < 30
-    height_wind_dev_df = height_wind_dev_df[idx]
-
-    height_wind_dev_df['height_bins'] = height_wind_dev_df['height_m'] // delta_height * delta_height + delta_height / 2
-    height_wind_dev_df["dev_from_mig_direction"] = CalcSmallAngleDirDiffDf(height_wind_dev_df["wind_direction"],
-                                                                           bird_mig_dirn)
-    sign_dev = np.sign(height_wind_dev_df["dev_from_mig_direction"])
-    height_wind_dev_df['dev_mig_dirn_bins'] = np.abs(height_wind_dev_df["dev_from_mig_direction"]) // \
-                                              delta_alpha * delta_alpha + delta_alpha / 2
-    height_wind_dev_df['dev_mig_dirn_bins'] *= sign_dev
-
-    count_df = height_wind_dev_df.loc[:, ["height_bins", "dev_mig_dirn_bins", "airspeed_birds"]]
-    count_df = count_df.groupby(["height_bins", "dev_mig_dirn_bins"], as_index=False).count()
-    count_df.rename(columns={"airspeed_birds": "airspeed_birds_count"}, inplace=True)
-    height_wind_dev_df = height_wind_dev_df.groupby(["height_bins", "dev_mig_dirn_bins"], as_index=False).mean()
-    height_wind_dev_df = pd.merge(height_wind_dev_df, count_df, on=["height_bins", "dev_mig_dirn_bins"], how="inner")
-
-    unique_dev_mig_bins = np.arange(delta_alpha / 2 - 180, 180, delta_alpha)
-    z_dict = {"airspeed_birds": height_wind_dev_df['airspeed_birds'],
-              "airspeed_birds_count": height_wind_dev_df["airspeed_birds_count"]}
-    unique_height_bins, unique_dev_mig_bins, height_dev_grid = prepare_pcolor_grid_from_series(
-        height_wind_dev_df['height_bins'],
-        height_wind_dev_df[
-            'dev_mig_dirn_bins'],
-        z_dict,
-        uniqueX=unique_height_bins,
-        uniqueY=unique_dev_mig_bins)
-
-    title_str = r"Birds flight speed compensation"
-    plot_averages_pcolor(x=unique_dev_mig_bins, y=unique_height_bins, z=height_dev_grid['airspeed_birds'], cmap='jet',
-                         xlab=r'$\alpha_{w} - \alpha_{mig} [^\circ$]', ylab='height [m]', title_str=title_str,
-                         out_dir=figure_summary_dir, out_name="flight_comp_airspeed.png", min_z=None,
-                         max_z=None, xlim=None, ylim=None, cbar_label="[m/s]", save_plot=save_plots)
-
-    title_str = r"Birds flight compensation counts"
-    plot_averages_pcolor(x=unique_dev_mig_bins, y=unique_height_bins, z=height_dev_grid['airspeed_birds_count'],
-                         cmap='RdYlBu',
-                         xlab=r'$\alpha_{w} - \alpha_{mig} [^\circ$]', ylab='height [m]', title_str=title_str,
-                         out_dir=figure_summary_dir, out_name="flight_comp_counts.png", min_z=None,
-                         max_z=None, xlim=None, ylim=None, cbar_label="[no units]", save_plot=save_plots)
-    ####################################################################################################################
 
     # Plot: insect prop vs time of day vs height
     echo_profile_df = wind_error.loc[:,
