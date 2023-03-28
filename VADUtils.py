@@ -179,15 +179,26 @@ def MinMaxNormalization(x, min_guard=MAX_INT, max_guard=MIN_INT):
     x_max = max(max_guard, np.nanmax(x))
     return (x - x_min) / (x_max - x_min)
 
-def GetVADWeights(bi_scores_cut, echo_type):
-    if echo_type == VADMask.birds:
-        return MinMaxNormalization(x=bi_scores_cut, min_guard=0.5, max_guard=1)
-    if echo_type == VADMask.insects:
-        return MinMaxNormalization(x=1 - bi_scores_cut, min_guard=0.5, max_guard=1)
-    if echo_type == VADMask.biological:
-        return MinMaxNormalization(x=1 - bi_scores_cut, min_guard=0, max_guard=1)
+
+def GetVADWeights(bi_scores_cut, echo_type, to_normalize=False):
     if echo_type == VADMask.weather:
         return 1
+
+    if to_normalize:
+        if echo_type == VADMask.birds:
+            return MinMaxNormalization(x=bi_scores_cut, min_guard=0.5, max_guard=1)
+        if echo_type == VADMask.insects:
+            return MinMaxNormalization(x=1 - bi_scores_cut, min_guard=0.5, max_guard=1)
+        if echo_type == VADMask.biological:
+            return MinMaxNormalization(x=1 - bi_scores_cut, min_guard=0, max_guard=1)
+    else:
+        if echo_type == VADMask.birds:
+            return bi_scores_cut
+        if echo_type == VADMask.insects:
+            return 1 - bi_scores_cut
+        if echo_type == VADMask.biological:
+            return 1 - bi_scores_cut
+
     return None
 
 def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebugPlot, use_weights=False):
