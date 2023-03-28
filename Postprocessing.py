@@ -170,7 +170,10 @@ def plot_weekly_averages(weekly_data, day_starts, noon_s_midnight, xtick_labs, k
         if z is None:
             continue
 
-        im = ax[week].pcolor(x, y, np.transpose(z), cmap=cmap, vmin=min_z, vmax=max_z)
+        if min_z is not None:
+            v_min = min(np.nanmin(z), min_z)
+            v_max = max(np.nanmax(z), max_z)
+        im = ax[week].pcolor(x, y, np.transpose(z), cmap=cmap, vmin=v_min, vmax=v_max)
         ax[week].set_xticks(noon_s_midnight)
         ax[week].set_xticklabels(xtick_labs[week])
         if xlim:
@@ -631,12 +634,11 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     max_diff = np.nanmax(height_ip_df['airspeed_diff'])
     min_diff = np.nanmin(height_ip_df['airspeed_diff'])
     max_amp = round(max(np.abs(max_diff), np.abs(min_diff)))
-    max_amp = max(max_amp, 2)
+    max_amp = max(max_amp, 3)
 
     title_str = r"$bias_{birds} - bias_{insects}$"
     info_str = ">  {} m/s,  {}%\n<= {} m/s, {}%\nelse {}%".format(thresholds[1], round(pos_diff, 2), thresholds[0],
                                                                   round(neg_diff, 2), round(zero_diff, 2))
-
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_diff'], cmap='jet',
                          xlab='insect prop bio [%]', ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="airspeed_difference.png", min_z=-max_amp,
@@ -645,7 +647,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
     # Plot of height vs insect prop vs airspeed_bio
     max_airspeed_bio = np.max(np.abs(height_ip_df['airspeed_biological']))
-    print("max_airspeed_bio: ", max_airspeed_bio)
+    max_airspeed = max(8, max_airspeed_bio)
 
     height_ip_df["abs_bio_off_U"], height_ip_df["abs_bio_off_V"] = \
         Polar2CartesianComponentsDf(spd=0.5, dirn=height_ip_df["abs_bio_wind_offset"])
@@ -656,7 +658,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                                            xlab='insect prop bio [%]', ylab='height [m]', title_str=title_str,
                                            out_dir=figure_summary_dir,
                                            out_name="airspeed_biological_height_insectprop.png", min_z=0,
-                                           max_z=max_airspeed_bio, vec_df=height_ip_df, x_col="insect_prop_bins",
+                                           max_z=max_airspeed, vec_df=height_ip_df, x_col="insect_prop_bins",
                                            y_col="height_bins", u_col="abs_bio_off_U", v_col="abs_bio_off_V",
                                            xlim=(0, 100), ylim=(0, 1000), cbar_label="[m/s]",
                                            save_plot=save_plots)
@@ -668,7 +670,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_insects'], cmap='jet',
                          xlab='insect prop bio [%]', ylab='height [m]', title_str=r"$bias_{insects}$",
                          out_dir=figure_summary_dir, out_name="airspeed_ins_height_insectprop.png", min_z=0,
-                         max_z=max_airspeed_bio, xlim=(0, 100), ylim=(0, 1000), cbar_label="[m/s]",
+                         max_z=max_airspeed, xlim=(0, 100), ylim=(0, 1000), cbar_label="[m/s]",
                          save_plot=save_plots)
 
     ####################################################################################################################
@@ -851,8 +853,9 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     if generate_weekly_month_profiles:
         population_df = wind_error.loc[:,
                         ["month", "day", "time_hour", "insect_prop_bio", "height_m", "prop_weather_scan",
-                         "num_insects_height", "num_birds_height", "airspeed_biological", "biological_wind_offset",
-                         "biological_speed", "biological_direction", "wind_speed", "wind_direction"]]
+                         "num_insects_height", "num_birds_height", "airspeed_biological", "airspeed_insects",
+                         "biological_wind_offset", "biological_speed", "biological_direction", "wind_speed",
+                         "wind_direction"]]
 
         population_df["height_bins"] = population_df['height_m'] // delta_height * delta_height + delta_height / 2
         population_df["time_hour_bins"] = population_df[
@@ -877,6 +880,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
         unique_time_week, unique_height_bins, weekly_data, xlabels = prepare_weekly_data_for_pcolor_plot(
             key_cols=['num_birds_height', 'num_insects_height', 'insect_prop_bio', 'airspeed_biological',
+                      'airspeed_insects',
                       'biological_speed', 'wind_speed'],
             x_col_name='time_hour_week',
             y_col_name='height_bins',
@@ -924,9 +928,20 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
                              xtick_labs=xlabels,
                              key_col='airspeed_biological', x=unique_time_week, y=unique_height_bins,
-                             min_z=None, max_z=None, xlab="Time [UTC]", ylab="Height [m]", cmap='jet',
+                             min_z=0, max_z=8, xlab="Time [UTC]", ylab="Height [m]", cmap='jet',
                              title_str=title_str, out_dir=figure_summary_dir,
                              out_name="airspeed_biological_height_timeweek.png",
+                             xlim=None,
+                             ylim=(0, 1000), cbar_label="[m/s]", save_plot=save_plots)
+
+        # Plot for airspeed_ins height profile for whole month.
+        title_str = "Biases from insect echoes"
+        plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
+                             xtick_labs=xlabels,
+                             key_col='airspeed_insects', x=unique_time_week, y=unique_height_bins,
+                             min_z=0, max_z=8, xlab="Time [UTC]", ylab="Height [m]", cmap='jet',
+                             title_str=title_str, out_dir=figure_summary_dir,
+                             out_name="airspeed_insects_height_timeweek.png",
                              xlim=None,
                              ylim=(0, 1000), cbar_label="[m/s]", save_plot=save_plots)
 
@@ -978,7 +993,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                                                vec_df=population_grouped_df,
                                                x_col="time_hour_week", y_col="height_bins", u_col="bio_off_U",
                                                v_col="bio_off_V", cmap='jet', xlab="Time [UTC]", ylab="Height [m]",
-                                               title_str="Flight velocity, biological.", min_z=0, max_z=None,
+                                               title_str="Flight velocity, biological.", min_z=0, max_z=8,
                                                out_dir=figure_summary_dir,
                                                out_name="flight_vel_bio_height_timeweek.png", xlim=None, ylim=(0, 1000),
                                                save_plot=save_plots)
@@ -1009,7 +1024,7 @@ def Main():
     figure_dir = "./figures"
     plot_title_suffix = "May 1 - 31, 2018"
     out_name_suffix = "May_1_31_2018"
-    save_plots = False  # False
+    save_plots = True  # False
     generate_weekly_month_profiles = True  # False
 
     wind_source_desc = GetWindSourceDescription(gt_wind_source)
