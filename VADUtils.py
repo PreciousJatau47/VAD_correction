@@ -9,7 +9,6 @@ from scipy.optimize import least_squares, minimize
 from VADMaskEnum import *
 from WindUtils import Polar2CartesianComponentsDf, Cartesian2PolarComponentsDf
 
-MIN_FRACTION_SAMPLES_REQUIRED = 1.5
 signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])
 MAX_FLOAT = sys.float_info.max
 MIN_FLOAT = sys.float_info.min
@@ -59,7 +58,7 @@ def MixVADs(vad_main, vad_sec, a, mix_r):
     return vad_mix, is_main_vad, a_idxs, mix_idxs, b_idxs, weights_mix
 
 
-def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights=1):
+def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights=1, min_required_nsamples=720):
     """
     :param pred_var: Should have shape (N,).
     :param resp_var: Should have shape (N,).
@@ -67,7 +66,7 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights=
     :param showDebugPlot:
     :return:
     """
-    if (len(pred_var) / 720) < MIN_FRACTION_SAMPLES_REQUIRED:
+    if len(pred_var) < min_required_nsamples:
         return np.nan, np.nan, None
 
     # Cost function.
@@ -179,25 +178,40 @@ def MinMaxNormalization(x, min_guard=MAX_FLOAT, max_guard=MIN_FLOAT):
     x_max = max(max_guard, np.nanmax(x))
     return (x - x_min) / (x_max - x_min)
 
-def GetVADWeights(bi_scores_cut, echo_type):
-    if echo_type == VADMask.birds:
-        return MinMaxNormalization(x=bi_scores_cut, min_guard=0.5, max_guard=1)
-    if echo_type == VADMask.insects:
-        return MinMaxNormalization(x=1 - bi_scores_cut, min_guard=0.5, max_guard=1)
-    if echo_type == VADMask.biological:
-        return MinMaxNormalization(x=1 - bi_scores_cut, min_guard=0, max_guard=1)
+
+def GetVADWeights(bi_scores_cut, echo_type, to_normalize=False):
     if echo_type == VADMask.weather:
         return 1
+
+    if to_normalize:
+        if echo_type == VADMask.birds:
+            return MinMaxNormalization(x=bi_scores_cut, min_guard=0.5, max_guard=1)
+        if echo_type == VADMask.insects:
+            return MinMaxNormalization(x=1 - bi_scores_cut, min_guard=0.5, max_guard=1)
+        if echo_type == VADMask.biological:
+            return MinMaxNormalization(x=1 - bi_scores_cut, min_guard=0, max_guard=1)
+    else:
+        if echo_type == VADMask.birds:
+            return bi_scores_cut
+        if echo_type == VADMask.insects:
+            return 1 - bi_scores_cut
+        if echo_type == VADMask.biological:
+            return 1 - bi_scores_cut
+
     return None
 
 
 def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebugPlot, use_weights=False,
-                   clf_purity_threshold=0.5):
+                   clf_purity_threshold=0.5,min_required_nsamples=720):
     """
     :param signal_func:
     :param vad_ranges:
+    :param echo_type:
     :param radar_sp_table:
     :param clf_purity_threshold:
+    :param showDebugPlot:
+    :param use_weights:
+    :param min_required_nsamples:
     :return:
     """
     vad_mask = GetVADMask(radar_sp_table, echo_type, clf_purity_threshold=clf_purity_threshold)
@@ -225,7 +239,7 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
 
         description = "{}, {}m".format(GetVADMaskDescription(echo_type), height_vad)
         wind_speed, wind_dir, fitted_points = fitVAD(az_cut, velocity_cut, signal_func, showDebugPlot, description,
-                                                     weights=weights_cut)
+                                                     weights=weights_cut, min_required_nsamples=min_required_nsamples)
 
         if math.isnan(wind_dir):
             vad_valid = False
@@ -269,7 +283,7 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
 
 def Main():
     showDebugPlot = True
-    N = 720 * round(MIN_FRACTION_SAMPLES_REQUIRED)
+    N = 720
     t = np.linspace(0, 360, N)
 
     true_wind_speed = random.uniform(0, 20)

@@ -90,14 +90,17 @@ class TestVADUtils(unittest.TestCase):
         # Weighted VAD
         true_wind_speed = 15
         true_wind_dir = 90
+        sec_wind_speed = 11
+        sec_wind_dirn = 68
         vad_main = GenerateVAD(speed=true_wind_speed, dirn=true_wind_dir, dirn_grid=t) + GenerateNoiseNormal(
             num_samples=N)
-        vad_sec = GenerateVAD(speed=11, dirn=68, dirn_grid=t) + GenerateNoiseNormal(num_samples=N)
+        vad_sec = GenerateVAD(speed=sec_wind_speed, dirn=sec_wind_dirn, dirn_grid=t) + GenerateNoiseNormal(num_samples=N)
 
 
         vad_mix, is_main_vad, a_idxs, mix_idxs, b_idxs, weights_mix = MixVADs(vad_main=vad_main, vad_sec=vad_sec,
                                                                               a=1 / 20, mix_r=9 / 10)
 
+        ## Test using all points
         wind_speed, wind_dir, vad_fit = fitVAD(t, vad_main, signal_func, showDebugPlot=False, description='')
         print()
         print("Fit on pure VAD")
@@ -106,14 +109,14 @@ class TestVADUtils(unittest.TestCase):
         print()
 
         wind_speed, wind_dir, vad_fit = fitVAD(t, vad_mix, signal_func, showDebugPlot=False, description='')
-        print("Weighted fit on contaminated VAD")
+        print("Unweighted fit on contaminated VAD")
         print(wind_speed)
         print(wind_dir)
         print()
 
         wind_speed, wind_dir, vad_fit = fitVAD(t, vad_mix, signal_func, showDebugPlot=False, description='',
                                                weights=is_main_vad)
-        print("Unweighted fit on contaminated VAD")
+        print("Weighted fit on contaminated VAD")
         print(wind_speed)
         print(wind_dir)
         print()
@@ -132,29 +135,54 @@ class TestVADUtils(unittest.TestCase):
         self.assertTrue(np.max(x_norm) <= 1)
 
     def test_GetVADWeights(self):
+        ## Tests without min-max normalization ##
+        # Birds
+        bi_score = np.array([0.6, 0.7, 0.99])
+        exp_score = bi_score.copy()
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.birds, to_normalize=False)
+        self.assertTrue(np.logical_and.reduce(np.isclose(a=exp_score, b=pred_score, atol=0.1, rtol=0.1)))
+
+        # Insects
+        bi_score = np.array([0.4, 0.3, 0.01])
+        exp_score = 1 - bi_score
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.insects, to_normalize=False)
+        self.assertTrue(np.logical_and.reduce(np.isclose(a=exp_score, b=pred_score, atol=0.1, rtol=0.1)))
+
+        # Biological
+        bi_score = np.array([0.5, 0.3, 0.01])
+        exp_score = 1 - bi_score
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.biological, to_normalize=False)
+        self.assertTrue(np.logical_and.reduce(np.isclose(a=exp_score, b=pred_score, atol=0.1, rtol=0.1)))
+
+        # Weather
+        bi_score = np.array([0.6, 0.7, 0.99])
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.weather, to_normalize=False)
+        self.assertTrue(pred_score == 1)
+
+        ## Tests with min-max normalization ##
         # Birds
         bi_score = np.array([0.6, 0.7, 0.99])
         exp_score = (bi_score - 0.5) / (0.99 - 0.5)
-        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.birds)
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.birds, to_normalize=True)
         self.assertTrue(np.logical_and.reduce(np.isclose(a=exp_score, b=pred_score, atol=0.1, rtol=0.1)))
 
         # Insects
         bi_score = np.array([0.4, 0.3, 0.01])
         bi_score_inv = 1 - bi_score
         exp_score = (bi_score_inv - 0.5) / (0.99 - 0.5)
-        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.insects)
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.insects, to_normalize=True)
         self.assertTrue(np.logical_and.reduce(np.isclose(a=exp_score, b=pred_score, atol=0.1, rtol=0.1)))
 
         # Biological
         bi_score = np.array([0.5, 0.3, 0.01])
         bi_score_inv = 1 - bi_score
         exp_score = (bi_score_inv - 0) / (1 - 0)
-        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.biological)
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.biological, to_normalize=True)
         self.assertTrue(np.logical_and.reduce(np.isclose(a=exp_score, b=pred_score, atol=0.1, rtol=0.1)))
 
         # Weather
         bi_score = np.array([0.6, 0.7, 0.99])
-        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.weather)
+        pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.weather, to_normalize=True)
         self.assertTrue(pred_score == 1)
 
 if __name__ == "__main__":
