@@ -148,7 +148,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                     ground_truth_source=WindSource.sounding,
                     rap_folder=None, correct_hca_weather=False, biw_norm_stats_file=None,
                     biw_clf_file=None, log_dir='./', experiment_name='', allowed_el_hca=None, use_vad_weights=False,
-                    clf_purity_threshold=0.5):
+                    clf_purity_threshold=0.5,
+                    min_required_nsamples=720):
     # Echo count options
     echo_count_log_dir = os.path.join(echo_count_log_dir, batch_folder)
     if correct_hca_weather:
@@ -335,7 +336,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                                            biw_norm_stats_file=biw_norm_stats_file,
                                                                            biw_clf_file=biw_clf_file,
                                                                            use_vad_weights=use_vad_weights,
-                                                                           clf_purity_threshold=clf_purity_threshold)
+                                                                           clf_purity_threshold=clf_purity_threshold,
+                                                                           min_required_nsamples=min_required_nsamples)
 
                     # Initialize accumulator for VAD profiles.
                     if vad_profiles_accumm is None:
@@ -717,6 +719,7 @@ def Main():
     # VAD
     vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather, VADMask.biological]
     use_vad_weights = False
+    min_req_nsamples_vad = 360
     clf_purity_threshold = 0.5
     delta_time_hr = 2 * 60 / 60
     time_window = {'noon': (12 - delta_time_hr, 12 + delta_time_hr),
@@ -749,7 +752,8 @@ def Main():
                     correct_hca_weather=correct_hca_weather,
                     biw_norm_stats_file=biw_norm_stats_file, biw_clf_file=biw_clf_file, log_dir=e2e_analysis_log_dir,
                     experiment_name='', allowed_el_hca=allowed_el_hca, use_vad_weights=use_vad_weights,
-                    clf_purity_threshold=clf_purity_threshold)
+                    clf_purity_threshold=clf_purity_threshold,
+                    min_required_nsamples=min_req_nsamples_vad)
 
 
 Main()
