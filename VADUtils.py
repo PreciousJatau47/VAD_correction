@@ -180,6 +180,9 @@ def MinMaxNormalization(x, min_guard=MAX_FLOAT, max_guard=MIN_FLOAT):
 
 
 def GetVADWeights(bi_scores_cut, echo_type, to_normalize=False):
+    if len(bi_scores_cut) == 0:
+        return 0
+
     if echo_type == VADMask.weather:
         return 1
 
@@ -226,16 +229,18 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
         idx_cut = np.logical_and(idx_cut, vad_mask)
         velocity_cut = radar_sp_table['velocity'][idx_cut]
         az_cut = radar_sp_table['azimuth'][idx_cut]
+        bi_scores_cut = radar_sp_table['BIProb'][idx_cut]
         weights_cut = 1
 
         if use_weights:
-            bi_scores_cut = radar_sp_table['BIProb'][idx_cut]
             weights_cut = GetVADWeights(bi_scores_cut=bi_scores_cut,echo_type=echo_type)
 
-        # Mean reflectivity per height bin.
-        # TODO use reflectivity mask.
-        idx_ref = np.logical_and(idx_cut, radar_sp_table["reflectivity"] != -33.0)
-        mean_ref = np.mean(radar_sp_table['reflectivity'][idx_ref])
+        # Mean statistics per height bin.
+        # TODO (test pending).
+        idx_ref = np.logical_and(idx_cut, radar_sp_table["reflectivity"] > -32.5)
+        ref_cut = radar_sp_table['reflectivity'][idx_ref]
+        mean_ref = np.nanmean(ref_cut)
+        mean_prob = np.nanmean(bi_scores_cut)
 
         description = "{}, {}m".format(GetVADMaskDescription(echo_type), height_vad)
         wind_speed, wind_dir, fitted_points = fitVAD(az_cut, velocity_cut, signal_func, showDebugPlot, description,
@@ -250,11 +255,12 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
             wind_speed, wind_dir, fitted_points = np.nan, np.nan, None
 
         windU, windV = Polar2CartesianComponentsDf(wind_speed, wind_dir)
-        wind_profile_vad.append([wind_speed, wind_dir, windU, windV, height_vad, len(velocity_cut), mean_ref])
+        wind_profile_vad.append(
+            [wind_speed, wind_dir, windU, windV, height_vad, len(velocity_cut), mean_ref, mean_prob])
 
     wind_profile_vad = pd.DataFrame(wind_profile_vad,
                                     columns=["wind_speed", "wind_direction", "wind_U", "wind_V", "height",
-                                             "num_samples", "mean_ref"])
+                                             "num_samples", "mean_ref", "mean_prob"])
     wind_profile_vad = wind_profile_vad.drop_duplicates(subset='height', keep='last', ignore_index=True)
 
     tmp = False

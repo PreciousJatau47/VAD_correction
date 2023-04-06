@@ -49,7 +49,9 @@ def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist):
 
         if echo == VADMask.biological:
             vad_vel_cols.insert(1, 'mean_ref')
+            vad_vel_cols.insert(2, 'mean_prob')
             new_cols.insert(1, '_'.join(['mean_ref', GetVADMaskDescription(echo)]))
+            new_cols.insert(2, '_'.join(['mean_prob', GetVADMaskDescription(echo)]))
 
         echo_df = vad[echo].loc[:, vad_vel_cols]
         echo_df.rename(columns = dict(zip(vad_vel_cols, new_cols)), inplace=True)

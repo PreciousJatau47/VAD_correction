@@ -272,6 +272,8 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
     df_interp.loc[range(len(vad_df)), 'num_samples'] = vad_df['num_samples']
     df_interp['mean_ref'] = np.nan
     df_interp.loc[range(len(vad_df)), 'mean_ref'] = vad_df['mean_ref']
+    df_interp['mean_prob'] = np.nan
+    df_interp.loc[range(len(vad_df)), 'mean_prob'] = vad_df['mean_prob']
 
     # TODO(pjatau) remove this after a few runs
     assert round(df_interp['wind_speed']).equals(round(spd_interp))

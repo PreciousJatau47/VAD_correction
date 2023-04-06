@@ -12,6 +12,11 @@ from NexradUtils import *
 from RadarXSoundingUtils import RadarXSoundingDistance
 from AirspeedAnalysisUtils import GetAirSpeedScan, UpdateWindError
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
 font = {'family': 'DejaVu Sans',
         'weight': 'bold',
         'size': 15}
@@ -181,12 +186,17 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
         continue_from_last_checkpoint = continue_from_last_checkpoint and os.path.isdir(experiment_dir)
 
     if continue_from_last_checkpoint:
-        log_path = os.path.join(experiment_dir, ''.join([batch_folder, '.pkl']))
-        p_in = open(log_path, "rb")
-        _, idx_days_last_log = pickle.load(p_in)
-        idx_days_last_log += 1
-        print(_.shape)
-        p_in.close()
+        log_suffix = '_weights_{}_threshold_{}'.format(int(use_vad_weights), int(clf_purity_threshold * 100))
+        log_path = os.path.join(experiment_dir, ''.join([batch_folder, log_suffix, '.pkl']))
+
+        if os.path.isfile(log_path): # Continue previous subexperiment
+            p_in = open(log_path, "rb")
+            _, idx_days_last_log = pickle.load(p_in)
+            idx_days_last_log += 1
+            print(_.shape)
+            p_in.close()
+        else: # Start new subexperiment
+            idx_days_last_log = 0
     else:
         current_time = datetime.datetime.now()
         datetime_id = "{}{}{}_{}".format(current_time.year, current_time.month, current_time.day, current_time.hour)
@@ -690,10 +700,10 @@ def Main():
     figure_dir = './figures'
     save_ppi_plots = False
 
-    batch_folder = "KOHX_20180503_test_data" #"KOHX_20180516_20180531" #"KOHX_20180501_20180515" #"KOHX_20180516_20180531" # 'KLVX_20180501_20180531' #'KHTX_20180501_20180531' #"KOHX_20180516_20180531" #  # "KOHX_20180516_20180531"
+    batch_folder = "KOHX_20180501_20180531" #"KOHX_20180516_20180531" #"KOHX_20180501_20180515" #"KOHX_20180516_20180531" # 'KLVX_20180501_20180531' #'KHTX_20180501_20180531'
     # date_pattern = "*KENX201804{}*_V06.*"
-    start_day = 3 #16
-    stop_day = 3 #31
+    start_day = 1 #16
+    stop_day = 31 #31
     max_range = 400  # in km.
     max_height_VAD = 1000  # in m.
 
@@ -718,13 +728,13 @@ def Main():
 
     # VAD
     vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather, VADMask.biological]
-    use_vad_weights = False
-    min_req_nsamples_vad = 360
-    clf_purity_threshold = 0.5
+    min_req_nsamples_vad = 720
     delta_time_hr = 2 * 60 / 60
     time_window = {'noon': (12 - delta_time_hr, 12 + delta_time_hr),
                    'midnight': (24 - delta_time_hr, (24 + delta_time_hr) % 24)}
     vad_sounding_output_dir = "./vad_sounding_comparison_logs"
+
+    e2e_analysis_log_dir = './batch_analysis_logs'
 
     # GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
     #                          clf_file, output_log_dir, figure_dir, save_ppi_plots, force_output_logging,
@@ -739,21 +749,32 @@ def Main():
     #                  correct_hca_weather=correct_hca_weather, biw_clf_file=biw_clf_file,
     #                  biw_norm_stats_file=biw_norm_stats_file)
 
-    e2e_analysis_log_dir = './batch_analysis_logs'
+    # Experiment parameters space
+    experiment_name = "KOHX_20180501_20180531_launched_2023330_14"
+    use_vad_weights_grid = [False, True]
+    clf_purity_threshold_grid = [0.5, 0.4, 0.3, 0.2, 0.1]
 
-    E2EWindAnalysis(batch_folder=batch_folder, radar_folder=radar_folder, level3_folder=level3_folder,
-                    start_day=start_day, stop_day=stop_day, date_pattern=date_pattern, max_range=max_range,
-                    max_height_VAD=max_height_VAD, time_window=time_window, clf_file=clf_file,
-                    radar_t_sounding=radar_t_sounding, sounding_log_dir=sounding_log_dir,
-                    norm_stats_file=norm_stats_file, vad_jobs=vad_jobs, figure_dir=figure_dir,
-                    vad_sounding_dir=vad_sounding_output_dir, echo_count_log_dir=output_log_dir,
-                    save_ppi_plots=save_ppi_plots, force_output_logging=force_output_logging,
-                    ground_truth_source=ground_truth_wind, rap_folder=rap_folder,
-                    correct_hca_weather=correct_hca_weather,
-                    biw_norm_stats_file=biw_norm_stats_file, biw_clf_file=biw_clf_file, log_dir=e2e_analysis_log_dir,
-                    experiment_name='', allowed_el_hca=allowed_el_hca, use_vad_weights=use_vad_weights,
-                    clf_purity_threshold=clf_purity_threshold,
-                    min_required_nsamples=min_req_nsamples_vad)
+    for use_vad_weights in use_vad_weights_grid:
+        for clf_purity_threshold in clf_purity_threshold_grid:
+            print("use_vad_weights: ", use_vad_weights)
+            print("clf_purity_threshold: ", clf_purity_threshold)
+
+            E2EWindAnalysis(batch_folder=batch_folder, radar_folder=radar_folder, level3_folder=level3_folder,
+                            start_day=start_day, stop_day=stop_day, date_pattern=date_pattern, max_range=max_range,
+                            max_height_VAD=max_height_VAD, time_window=time_window, clf_file=clf_file,
+                            radar_t_sounding=radar_t_sounding, sounding_log_dir=sounding_log_dir,
+                            norm_stats_file=norm_stats_file, vad_jobs=vad_jobs, figure_dir=figure_dir,
+                            vad_sounding_dir=vad_sounding_output_dir, echo_count_log_dir=output_log_dir,
+                            save_ppi_plots=save_ppi_plots, force_output_logging=force_output_logging,
+                            ground_truth_source=ground_truth_wind, rap_folder=rap_folder,
+                            correct_hca_weather=correct_hca_weather,
+                            biw_norm_stats_file=biw_norm_stats_file, biw_clf_file=biw_clf_file,
+                            log_dir=e2e_analysis_log_dir,
+                            experiment_name=experiment_name, allowed_el_hca=allowed_el_hca,
+                            use_vad_weights=use_vad_weights,
+                            clf_purity_threshold=clf_purity_threshold, min_required_nsamples=min_req_nsamples_vad)
+
+    return
 
 
 Main()
