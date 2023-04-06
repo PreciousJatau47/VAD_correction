@@ -582,6 +582,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
          "prop_weather_scan", "biological_wind_offset"]]
     height_ip_df["abs_bio_wind_offset"] = np.abs(height_ip_df["biological_wind_offset"])
     height_ip_df['airspeed_diff'] = height_ip_df['airspeed_birds'] - height_ip_df['airspeed_insects']
+    height_ip_df['airspeed_diff_bio_ins'] = height_ip_df['airspeed_biological'] - height_ip_df['airspeed_insects']
     height_ip_df['height_bins'] = height_ip_df['height_m'] // delta_height * delta_height + delta_height / 2
     height_ip_df["insect_prop_bins"] = height_ip_df[
                                            "insect_prop_bio"] // delta_insect_prop * delta_insect_prop + delta_insect_prop / 2
@@ -605,13 +606,15 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         plt.savefig(os.path.join(figure_summary_dir, "bias_bio_scatter.png"), dpi=200)
     ####################################################################################################################
 
-    height_ip_df = height_ip_df.groupby(["height_bins", "bird_prop_bins"], as_index=False).mean()
+    height_ip_df = height_ip_df.groupby(["height_bins", "insect_prop_bins"], as_index=False).mean()
+
 
     unique_insect_prop_bins = np.arange(delta_insect_prop / 2, 100, delta_insect_prop)
     unique_height_bins = np.arange(delta_height / 2, 1000, delta_height)
     z_dict = {"airspeed_diff": height_ip_df['airspeed_diff'],
               'airspeed_biological': height_ip_df['airspeed_biological'],
-              'airspeed_insects': height_ip_df['airspeed_insects']}  # monthly averages
+              'airspeed_insects': height_ip_df['airspeed_insects'],
+              'airspeed_diff_bio_ins': height_ip_df['airspeed_diff_bio_ins']}  # monthly averages
 
     unique_height_bins, ins_prop_bins, height_ip_grid = prepare_pcolor_grid_from_series(height_ip_df['height_bins'],
                                                                                         height_ip_df[
@@ -620,7 +623,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                                                                                         uniqueX=unique_height_bins,
                                                                                         uniqueY=unique_insect_prop_bins)
 
-    # Plot of height vs insect prop vs airspeed difference
+    # Plot of height vs insect prop vs bird-insect airspeed difference
     thresholds = (-Constants.BI_BIAS_DIFF_THRESHOLD, Constants.BI_BIAS_DIFF_THRESHOLD)
 
     total_valid = np.sum(np.isfinite(height_ip_df['airspeed_diff']))
@@ -642,6 +645,23 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_diff'], cmap='jet',
                          xlab='insect prop bio [%]', ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="airspeed_difference.png", min_z=-max_amp,
+                         max_z=max_amp, xlim=(0, 100), ylim=(0, 1000), plot_txt=(55, 800, info_str), cbar_label="[m/s]",
+                         save_plot=save_plots)
+
+    # Plot of height vs insect prop vs bio-insect airspeed difference
+    diff_bio_ins = height_ip_df['airspeed_diff_bio_ins']
+    total_valid = np.sum(np.isfinite(diff_bio_ins))
+    pos_diff = np.sum(diff_bio_ins > thresholds[1]) / total_valid * 100
+    zero_diff = np.sum(gu.logical_and(diff_bio_ins <= thresholds[1], diff_bio_ins > thresholds[0])) / total_valid * 100
+    neg_diff = np.sum(diff_bio_ins <= thresholds[0]) / total_valid * 100
+
+    title_str = r"$bias_{bio} - bias_{insects}$"
+    info_str = ">  {} m/s,  {}%\n<= {} m/s, {}%\nelse {}%".format(thresholds[1], round(pos_diff, 2), thresholds[0],
+                                                                  round(neg_diff, 2), round(zero_diff, 2))
+
+    plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_diff_bio_ins'], cmap='jet',
+                         xlab='insect prop bio [%]', ylab='height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="airspeed_difference_bio_ins.png", min_z=-max_amp,
                          max_z=max_amp, xlim=(0, 100), ylim=(0, 1000), plot_txt=(55, 800, info_str), cbar_label="[m/s]",
                          save_plot=save_plots)
 
@@ -956,7 +976,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 def Main():
     # Inputs
     airspeed_log_dir = r'./batch_analysis_logs'
-    airspeed_files = ['debug_parameter_tuning/KOHX_20180501_20180531_weights_0_threshold_50.pkl']
+    airspeed_files = ['parameter_tuning_720pts_prob_profile/KOHX_20180501_20180531_weights_0_threshold_50.pkl']
     # airspeed_files = ['KOHX_20180516_20180531_launched_202329_11/KOHX_20180516_20180531.pkl',
     #                   'KOHX_20180501_20180515_launched_202328_19/KOHX_20180501_20180515.pkl']
     # airspeed_files = ['KOHX_20180501_20180515_launched_2023118_16\KOHX_20180501_20180515.pkl',
