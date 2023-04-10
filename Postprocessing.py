@@ -20,6 +20,11 @@ font = {'family': 'DejaVu Sans',
 plt.rc('font', **font)
 
 
+class VadScore(enum.Enum):
+    insect_prop_scan = 0
+    insect_prop_height = 1
+    insect_clf_score = 2
+
 class Constants:
     DELTA_INSECT_PROP = 5
     DELTA_HEIGHT = 50
@@ -255,7 +260,7 @@ def plot_weekly_averages_with_vector_field(weekly_data, day_starts, noon_s_midni
     return
 
 
-def LoadWindError(airspeed_log_dir, airspeed_files, target_echoes, use_ins_height_profile, MAX_WEATHER_PROP,
+def LoadWindError(airspeed_log_dir, airspeed_files, target_echoes, vad_score_type, MAX_WEATHER_PROP,
                   MAX_WEATHER_PROP_SCAN, remove_cases_list=[]):
     wind_error = pd.DataFrame()
     for airspeed_file in airspeed_files:
@@ -286,7 +291,7 @@ def LoadWindError(airspeed_log_dir, airspeed_files, target_echoes, use_ins_heigh
                     GetVADMaskDescription(echo))], wind_error['wind_direction'])
 
     # Calculate insect-bird height profile.
-    if use_ins_height_profile:
+    if vad_score_type == VadScore.insect_prop_height:
         print('Using insect height profile. ')
         if 'num_insects_height' in wind_error.columns:
             wind_error['insect_prop_bio_height'] = 100 * wind_error['num_insects_height'] / (
@@ -294,6 +299,14 @@ def LoadWindError(airspeed_log_dir, airspeed_files, target_echoes, use_ins_heigh
             wind_error['insect_prop_bio'] = wind_error['insect_prop_bio_height']
         else:
             sys.exit('num_insects_height does not exist in wind_error.')
+    elif vad_score_type == VadScore.insect_clf_score:
+        print('Using insect probability profile. ')
+        if 'mean_prob_biological' in wind_error.columns:
+            wind_error['insect_prop_bio'] = 100 * (1-wind_error['mean_prob_biological'])
+        else:
+            sys.exit('mean_prob_biological does not exist in wind_error.')
+    else:
+        print('Using insect proportion for the whole scan. ')
 
     # Filter wind error data.
     constraints = [("prop_weather", 0, MAX_WEATHER_PROP), ("prop_weather_scan", 0, MAX_WEATHER_PROP_SCAN),
@@ -984,7 +997,7 @@ def Main():
 
     experiment_id = "post_processing_default"
     correct_hca_weather = True
-    use_ins_height_profile = True
+    vad_score = VadScore.insect_clf_score
     MAX_WEATHER_PROP = 10  # 10
     MAX_WEATHER_PROP_SCAN = 5  # 5
     remove_cases_list = []
@@ -994,7 +1007,7 @@ def Main():
     figure_dir = "./figures"
     plot_title_suffix = "May 1 - 31, 2018"
     out_name_suffix = "May_1_31_2018"
-    save_plots = True  # False
+    save_plots = False  # False
     generate_weekly_month_profiles = True  # False
 
     wind_source_desc = GetWindSourceDescription(gt_wind_source)
@@ -1004,7 +1017,7 @@ def Main():
     wind_error_constrained, constraints = LoadWindError(airspeed_log_dir=airspeed_log_dir,
                                                         airspeed_files=airspeed_files,
                                                         target_echoes=target_echoes,
-                                                        use_ins_height_profile=use_ins_height_profile,
+                                                        vad_score_type=vad_score,
                                                         MAX_WEATHER_PROP=MAX_WEATHER_PROP,
                                                         MAX_WEATHER_PROP_SCAN=MAX_WEATHER_PROP_SCAN,
                                                         remove_cases_list=remove_cases_list)
