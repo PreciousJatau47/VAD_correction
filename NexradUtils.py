@@ -111,9 +111,19 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
     data_table["hca_bio"] = data_table["hca"] == 10.0
     data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
 
-    data_table["height_bin_meters"] = (np.floor(
+    # TODO(pjatau) delete after a few runs
+    data_table["height_bin_meters_old"] = (np.floor(
         data_table["height"] / height_binsize) + 1) * height_binsize - height_binsize / 2
-    data_table["height_bin_meters"] *= 1000
+    data_table["height_bin_meters_old"] *= 1000
+
+    data_table["height_bin_meters"] = (data_table[
+                                           "height"] // height_binsize * height_binsize + height_binsize / 2) * 1000
+
+    # TODO(pjatau) delete after a few runs
+    this_ser = data_table["height_bin_meters_old"]
+    other_ser = data_table["height_bin_meters"]
+    status = np.isclose(a=this_ser, b=other_ser, rtol=0.1, atol=0.1)
+    assert np.logical_and.reduce(status)
 
     echo_mask = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
     X = data_table.loc[

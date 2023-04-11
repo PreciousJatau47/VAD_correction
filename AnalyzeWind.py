@@ -331,8 +331,9 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
                 log_dir_rap='./atmospheric_model_data/UV_wind_logs',
                 log_file_base_rap='{}_windcomponents_lat_{}_lon_{}.pkl', correct_hca_weather=True,
                 biw_norm_stats_file=None, biw_clf_file=None, allowed_el_hca=None, use_vad_weights=False,
-                clf_purity_threshold=0.5, min_required_nsamples=720):
+                clf_purity_threshold=0.5, min_required_nsamples=720, height_binsize=0.04):
 
+    height_binsize_m = int(height_binsize * 1000)
     radar_data_file_no_ext = os.path.splitext(radar_data_file)[0]
     radar_name, year, month, day, hh, mm, ss = read_info_from_radar_name(radar_data_file)
 
@@ -442,7 +443,6 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
         data_table["hca_bio"] = data_table["hca"] == 10.0
         data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
 
-        height_binsize = 0.04  # height bins in km
         data_table["height_bin_meters"] = (np.floor(
             data_table["height"] / height_binsize) + 1) * height_binsize - height_binsize / 2
         data_table["height_bin_meters"] *= 1000
@@ -469,7 +469,8 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
         vad_heights = vad_debug_params['vad_heights']
         show_vad_plot = vad_debug_params['show_plot']
     else:
-        vad_heights = np.arange(80, max_height_VAD, 40)
+        min_height_bin = np.min(data_table["height_bin_meters"])
+        vad_heights = np.arange(min_height_bin, max_height_VAD, height_binsize_m)
         # vad_heights = np.array([480])
         show_vad_plot = False
 

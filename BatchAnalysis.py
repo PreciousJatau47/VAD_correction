@@ -154,7 +154,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                     rap_folder=None, correct_hca_weather=False, biw_norm_stats_file=None,
                     biw_clf_file=None, log_dir='./', experiment_name='', allowed_el_hca=None, use_vad_weights=False,
                     clf_purity_threshold=0.5,
-                    min_required_nsamples=720):
+                    min_required_nsamples=720, height_binsize=0.04):
+
     # Echo count options
     echo_count_log_dir = os.path.join(echo_count_log_dir, batch_folder)
     if correct_hca_weather:
@@ -213,7 +214,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
 
     # TODO(pjatau) move out, maybe to function parameters.
     # Airspeed averaging options
-    height_bin_size = 40
+    height_bin_size_m = int(height_binsize * 1000)
     delta_time = 1  # 0.5
 
     sounding_df = None
@@ -267,7 +268,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                               correct_hca_weather=correct_hca_weather,
                                                               max_height_VAD=1000,
                                                               biw_norm_stats_file=biw_norm_stats_file,
-                                                              biw_clf_file=biw_clf_file, allowed_el_hca=allowed_el_hca)
+                                                              biw_clf_file=biw_clf_file, allowed_el_hca=allowed_el_hca,
+                                                              height_binsize=height_binsize)
 
             # Echo distribution.
             if data_table is None:
@@ -347,7 +349,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                                            biw_clf_file=biw_clf_file,
                                                                            use_vad_weights=use_vad_weights,
                                                                            clf_purity_threshold=clf_purity_threshold,
-                                                                           min_required_nsamples=min_required_nsamples)
+                                                                           min_required_nsamples=min_required_nsamples,
+                                                                           height_binsize=height_binsize)
 
                     # Initialize accumulator for VAD profiles.
                     if vad_profiles_accumm is None:
@@ -362,7 +365,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                                                                 vad_profiles=vad_profiles,
                                                                                                 vad_profiles_accumm=vad_profiles_accumm,
                                                                                                 averaged_profiles=averaged_profiles,
-                                                                                                height_bin_size=height_bin_size)
+                                                                                                height_bin_size=height_bin_size_m)
 
                     if not to_accumm:  # averaged scan available.
                         wind_error_averaged_df = UpdateWindError(wind_error_averaged_df, mid_file_log[0],
@@ -408,7 +411,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                                                                 vad_profiles=vad_profiles,
                                                                                                 vad_profiles_accumm=vad_profiles_accumm,
                                                                                                 averaged_profiles=averaged_profiles,
-                                                                                                height_bin_size=height_bin_size)
+                                                                                                height_bin_size=height_bin_size_m)
 
                     if not to_accumm:
                         # Need to update averaged df.
@@ -431,7 +434,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                                                     vad_profiles=None,
                                                                                     vad_profiles_accumm=vad_profiles_accumm,
                                                                                     averaged_profiles=averaged_profiles,
-                                                                                    height_bin_size=height_bin_size)
+                                                                                    height_bin_size=height_bin_size_m)
         wind_error_averaged_df = UpdateWindError(wind_error_averaged_df, mid_file_log[0], averaged_profiles,
                                                  sounding_df,
                                                  echo_dist_VAD, error_fn,
@@ -700,10 +703,10 @@ def Main():
     figure_dir = './figures'
     save_ppi_plots = False
 
-    batch_folder = "KOHX_20180501_20180531" #"KOHX_20180516_20180531" #"KOHX_20180501_20180515" #"KOHX_20180516_20180531" # 'KLVX_20180501_20180531' #'KHTX_20180501_20180531'
+    batch_folder = "KOHX_20180503_test_data" #"KOHX_20180516_20180531" #"KOHX_20180501_20180515" #"KOHX_20180516_20180531" # 'KLVX_20180501_20180531' #'KHTX_20180501_20180531'
     # date_pattern = "*KENX201804{}*_V06.*"
-    start_day = 1 #16
-    stop_day = 31 #31
+    start_day = 3 #16
+    stop_day = 3 #31
     max_range = 400  # in km.
     max_height_VAD = 1000  # in m.
 
@@ -750,9 +753,9 @@ def Main():
     #                  biw_norm_stats_file=biw_norm_stats_file)
 
     # Experiment parameters space
-    experiment_name = "KOHX_20180501_20180531_launched_2023330_14"
-    use_vad_weights_grid = [False, True]
-    clf_purity_threshold_grid = [0.5, 0.4, 0.3, 0.2, 0.1]
+    experiment_name = ""
+    use_vad_weights_grid = [False] #[False, True]
+    clf_purity_threshold_grid = [0.5] #[0.5, 0.4, 0.3, 0.2, 0.1]
 
     for use_vad_weights in use_vad_weights_grid:
         for clf_purity_threshold in clf_purity_threshold_grid:
@@ -772,7 +775,8 @@ def Main():
                             log_dir=e2e_analysis_log_dir,
                             experiment_name=experiment_name, allowed_el_hca=allowed_el_hca,
                             use_vad_weights=use_vad_weights,
-                            clf_purity_threshold=clf_purity_threshold, min_required_nsamples=min_req_nsamples_vad)
+                            clf_purity_threshold=clf_purity_threshold, min_required_nsamples=min_req_nsamples_vad,
+                            height_binsize=0.04)
 
     return
 
