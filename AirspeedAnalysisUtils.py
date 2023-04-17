@@ -25,11 +25,11 @@ def WindError(x1, y1, x2, y2, error_fn, reduce_fn):
     reduced_error = reduce_fn(scores)
     return reduced_error, scores, x_scores
 
-def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist):
 
+def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist, figure_dir, debug_plots=False):
     # Sounding
-    vel_profiles = sounding_df.loc[:,["HGHT", "DRCT","SMPS"]]
-    vel_profiles.rename(columns = {"HGHT":"height_m", "DRCT":"wind_direction","SMPS": "wind_speed"}, inplace=True)
+    vel_profiles = sounding_df.loc[:, ["HGHT", "DRCT", "SMPS"]]
+    vel_profiles.rename(columns={"HGHT": "height_m", "DRCT": "wind_direction", "SMPS": "wind_speed"}, inplace=True)
     wind_file_no_ext = os.path.splitext(wind_file)[0]
     vel_profiles['file_name'] = wind_file_no_ext
     vel_profiles = vel_profiles.drop_duplicates(subset='height_m', keep='last')
@@ -54,7 +54,7 @@ def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist):
             new_cols.insert(2, '_'.join(['mean_prob', GetVADMaskDescription(echo)]))
 
         echo_df = vad[echo].loc[:, vad_vel_cols]
-        echo_df.rename(columns = dict(zip(vad_vel_cols, new_cols)), inplace=True)
+        echo_df.rename(columns=dict(zip(vad_vel_cols, new_cols)), inplace=True)
         echo_df = echo_df.drop_duplicates(subset='height_m', keep='last')
 
         vel_profiles = pd.merge(vel_profiles, echo_df, on="height_m", how="outer")
@@ -63,7 +63,46 @@ def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist):
     vel_profiles['prop_insects'] = echo_dist['insects']
     vel_profiles['prop_weather'] = echo_dist['weather']
 
+    if debug_plots:
+        out_dir = os.path.join(figure_dir, 'vad_profiles')
+        if not os.path.isdir(out_dir):
+            os.makedirs(out_dir)
+
+        # VAD probability profile.
+        fig, ax = plt.subplots()
+        idx_profile = np.isfinite(vel_profiles["mean_prob_biological"])
+        ax.plot(vel_profiles["mean_prob_biological"][idx_profile], vel_profiles["height_m"][idx_profile])
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1100)
+        ax.grid(True)
+        ax.set_xlabel("Wind tracing score (no unit)")
+        ax.set_ylabel("Height (m)")
+        ax.set_title("VAD wind tracing profile")
+        plt.tight_layout()
+        plt.savefig(os.path.join(out_dir, ''.join([wind_file_no_ext, '_probs_profile'])), dpi=200)
+
+        # VAD Census profile.
+        fig, ax = plt.subplots()
+        idx_birds = np.isfinite(vel_profiles["num_birds_height"])
+        idx_insects = np.isfinite(vel_profiles["num_insects_height"])
+        max_pop = max(np.nanmax(vel_profiles['num_birds_height']), np.nanmax(vel_profiles['num_insects_height']))
+        max_pop = max(max_pop, 16500)
+
+        ax.plot(vel_profiles["num_birds_height"][idx_birds], vel_profiles["height_m"][idx_birds], label='birds', c='b')
+        ax.plot(vel_profiles["num_insects_height"][idx_insects], vel_profiles["height_m"][idx_insects], label='insects',
+                c='r')
+        ax.set_xlim(0, max_pop)
+        ax.set_ylim(0, 1100)
+        ax.grid(True)
+        ax.set_xlabel("Number of gates (no units)")
+        ax.set_ylabel("Height (m)")
+        ax.set_title("Bird and insect census")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(out_dir, ''.join([wind_file_no_ext, '_census_profile'])), dpi=200)
+
     return vel_profiles
+
 
 # TODO(pjatau) either make this generic enough to handle different number of jobs or add requirement that birds and
 #  insects vads, for example, must be provided.
@@ -103,7 +142,6 @@ def GetAirSpeedScan(wind_file, vad, sounding_df, echo_dist, error_fn, reduce_fn,
     y_insects_U = np.array(vad[VADMask.insects]['wind_U'])
     y_insects_V = np.array(vad[VADMask.insects]['wind_V'])
 
-
     # Biological.
     x_bio = np.array(vad[VADMask.biological]['height'])
     y_bio_U = np.array(vad[VADMask.biological]['wind_U'])
@@ -125,9 +163,9 @@ def GetAirSpeedScan(wind_file, vad, sounding_df, echo_dist, error_fn, reduce_fn,
 
     # Sounding vs biological.
     err_sound_bio_U, scores_sound_bio_U, x_sound_bio_U = WindError(x_sound, y_sound_U, x_bio,
-                                                                               y_bio_U, error_fn, reduce_fn)
+                                                                   y_bio_U, error_fn, reduce_fn)
     err_sound_bio_V, scores_sound_bio_V, x_sound_bio_V = WindError(x_sound, y_sound_V, x_bio,
-                                                                               y_bio_V, error_fn, reduce_fn)
+                                                                   y_bio_V, error_fn, reduce_fn)
     airspeed_bio = GetAirSpeeds(scores_sound_bio_U, scores_sound_bio_V)
 
     # Insect-to-bird ratio per height
@@ -154,7 +192,7 @@ def GetAirSpeedScan(wind_file, vad, sounding_df, echo_dist, error_fn, reduce_fn,
         if np.isfinite(num_insects) and np.isfinite(num_birds):
             num_insects_profile[ih] = num_insects
             num_birds_profile[ih] = num_birds
-            rel_insect_prop_bio[ih] =  num_insects/ (num_insects + num_birds)
+            rel_insect_prop_bio[ih] = num_insects / (num_insects + num_birds)
 
     # TODO(pjatau) delete this check after a few runs.
     actual_rel_ins_prop = np.divide(num_insects_profile, num_insects_profile + num_birds_profile)
@@ -204,6 +242,7 @@ def GetAirSpeedScan(wind_file, vad, sounding_df, echo_dist, error_fn, reduce_fn,
                          'prop_insects': echo_dist['insects'],
                          'prop_weather': echo_dist['weather']})
 
+
 def extract_features_from_ppi_name(s):
     radar_name = s[:4]
     yyyy = s[4:8]
@@ -218,7 +257,6 @@ def extract_features_from_ppi_name(s):
 
 def UpdateWindError(wind_error_df, target_file, vad_profiles, sounding_df, echo_dist_VAD, error_fn, reduce_fn,
                     ground_truth_source, figure_dir, batch_folder, n_birds, n_insects, n_weather):
-
     if sounding_df is None or vad_profiles is None or target_file == '':
         return wind_error_df
 
@@ -227,7 +265,7 @@ def UpdateWindError(wind_error_df, target_file, vad_profiles, sounding_df, echo_
             return wind_error_df
 
     airspeed_scan = GetVelocitiesScan(wind_file=target_file, vad=vad_profiles, sounding_df=sounding_df,
-                                      echo_dist=echo_dist_VAD)
+                                      echo_dist=echo_dist_VAD, figure_dir=figure_dir, debug_plots=False)
 
     # airspeed_scan = GetAirSpeedScan(wind_file=target_file, vad=vad_profiles, sounding_df=sounding_df,
     #                                 echo_dist=echo_dist_VAD, error_fn=error_fn, reduce_fn=reduce_fn,
