@@ -86,12 +86,6 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
     fig_comp, ax_comp = plt.subplots()
     ax_comp_sec = ax_comp.twinx()
 
-    # Mean reflectivity vs height.
-    wind_profile_vad = vad_profiles_job[VADMask.insects]
-    vad_height_idx = wind_profile_vad['height'] < max_height
-    ax_comp.plot(wind_profile_vad['mean_ref'][vad_height_idx], wind_profile_vad['height'][vad_height_idx], color='black',
-             label="Z")
-
     for job_id in vad_profiles_job.keys():
         wind_profile_vad = vad_profiles_job[job_id]
         vad_height_idx = wind_profile_vad['height'] < max_height
@@ -137,7 +131,7 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
         plt.savefig(os.path.join(output_folder,
                                  "".join([figure_prefix, "_wind_comparison_components_", figure_suffix, ".png"])),
                     dpi=200)
-    # plt.show()
+    plt.show()
     plt.close(fig_comp)
     plt.close('all')
 
