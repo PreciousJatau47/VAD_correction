@@ -10,7 +10,7 @@ from AnalyzeWind import classify_echoes, AnalyzeWind
 from VADMaskEnum import VADMask
 from NexradUtils import *
 from RadarXSoundingUtils import RadarXSoundingDistance
-from AirspeedAnalysisUtils import GetAirSpeedScan, UpdateWindError
+from AirspeedAnalysisUtils import UpdateWindError
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -35,8 +35,6 @@ def AccumulateOrAverageSelector(prev_scan_time, radar_scan_time, delta_time):
 
 
 "TODO(pjatau) Add documentation."
-
-
 def AccumulateAndAverage(to_accumm, radar_file, files_accumm, vad_profiles, vad_profiles_accumm, averaged_profiles,
                          height_bin_size):
     if to_accumm:
@@ -141,11 +139,6 @@ def TestAccumulateAndAverage():
         prev_scan_time = radar_scan_time
 
 
-# def TempMain():
-#     TestAccumulateAndAverage()
-#
-# TempMain()
-
 def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
                     max_height_VAD, time_window, clf_file, radar_t_sounding, sounding_log_dir,
                     norm_stats_file, vad_jobs, figure_dir, vad_sounding_dir, echo_count_log_dir, save_ppi_plots,
@@ -232,16 +225,9 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
 
     first_day = days[0]
     for idx_days in range(idx_days_last_log, len(days)):
-        # for idx_days in range(12, 12+1): # TODO(pjatau) erase me
         curr_day = days[idx_days]
         print("Processing ", curr_day, " ........")
         radar_scans = radar_scans_day[curr_day]  # ~200 scans
-        # wind_error_df = pd.DataFrame(
-        #     columns=['file_name', 'airspeed_birds', 'airspeed_insects', 'height_m', 'num_insects_height',
-        #              'num_birds_height',
-        #              'prop_birds', 'prop_insects',
-        #              'prop_weather', 'prop_weather_scan', 'insect_prop_bio', "radar", "year", "month", "day",
-        #              "time_hour"])
         wind_error_df = pd.DataFrame()
         wind_error_averaged_df = wind_error_df.copy()
 
@@ -298,7 +284,6 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                 title_suffix = "{}% birds, {}% insects, {}% weather.".format(prop_birds, prop_insects, prop_weather)
 
                 # 16s per plot item.
-
                 c_map = {}
                 c_map['reflectivity'] = color_map['reflectivity']
                 c_map['hca_weather'] = color_map['hca_weather']
@@ -704,7 +689,6 @@ def Main():
     save_ppi_plots = False
 
     batch_folder = "KOHX_20180503_test_data" #"KOHX_20180516_20180531" #"KOHX_20180501_20180515" #"KOHX_20180516_20180531" # 'KLVX_20180501_20180531' #'KHTX_20180501_20180531'
-    # date_pattern = "*KENX201804{}*_V06.*"
     start_day = 3 #16
     stop_day = 3 #31
     max_range = 400  # in km.
