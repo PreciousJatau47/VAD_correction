@@ -408,52 +408,52 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
         else:
             hca_vol = GetHcaVolFromFileList(hca_data_folder, radar_data_file_no_ext, l3_filelist, allowed_el_hca)
 
-    # Data table.
-    if data_table is None:
-        data_table = MergeRadarAndHCAUpdate(radar, hca_vol, max_range)
-        data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
-
-        if correct_hca_weather:
-            X_biw = data_table.loc[:, ['differential_reflectivity', 'differential_phase', 'cross_correlation_ratio']]
-            X_biw.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
-            X_biw.rename(columns={"differential_phase": "pdp"}, inplace=True)
-            X_biw.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
-            data_table['BIWClass'] = -1
-            biw_class, _ = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
-            data_table.loc[:, 'BIWClass'] = biw_class
-            # data_table.loc[:, 'BIWClass'] = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
-
-            # Correct HCA's misclassification of birds as weather within VAD region.
-            # if weather hca, and non-weather biw, and within collection region, set to biological
-            correction_msk = data_table["height"] < max_height_VAD
-            weather_hca = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
-            non_weather_biw = data_table['BIWClass'] != 3
-            correction_msk = np.logical_and(correction_msk, weather_hca)
-            correction_msk = np.logical_and(correction_msk, non_weather_biw)
-            data_table.loc[correction_msk, "hca"] = 10.0
-
-        # TODO Precious. Get original ZDR mask.
-        data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
-        data_table["hca_bio"] = data_table["hca"] == 10.0
-        data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
-
-        data_table["height_bin_meters"] = (np.floor(
-            data_table["height"] / height_binsize) + 1) * height_binsize - height_binsize / 2
-        data_table["height_bin_meters"] *= 1000
-
-        # Apply bird-insect classifier. -1 is non-bio, 1 is bird and 0 is insects.
-        echo_mask = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
-        X = data_table.loc[
-            echo_mask, ['differential_reflectivity', 'differential_phase', 'cross_correlation_ratio']]
-        X.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
-        X.rename(columns={"differential_phase": "pdp"}, inplace=True)
-        X.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
-        data_table['BIClass'], data_table['BIProb'] = -1, -1
-        if not X.empty:
-            bi_class, bi_probs = classify_echoes(X, clf_file, norm_stats_file)
-            data_table.loc[echo_mask, 'BIClass'] = bi_class
-            data_table.loc[echo_mask, 'BIProb'] = bi_probs[:, 1]
-            # data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file, norm_stats_path=norm_stats_file)
+    # # Data table.
+    # if data_table is None:
+    #     data_table = MergeRadarAndHCAUpdate(radar, hca_vol, max_range)
+    #     data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
+    #
+    #     if correct_hca_weather:
+    #         X_biw = data_table.loc[:, ['differential_reflectivity', 'differential_phase', 'cross_correlation_ratio']]
+    #         X_biw.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
+    #         X_biw.rename(columns={"differential_phase": "pdp"}, inplace=True)
+    #         X_biw.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
+    #         data_table['BIWClass'] = -1
+    #         biw_class, _ = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
+    #         data_table.loc[:, 'BIWClass'] = biw_class
+    #         # data_table.loc[:, 'BIWClass'] = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
+    #
+    #         # Correct HCA's misclassification of birds as weather within VAD region.
+    #         # if weather hca, and non-weather biw, and within collection region, set to biological
+    #         correction_msk = data_table["height"] < max_height_VAD
+    #         weather_hca = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
+    #         non_weather_biw = data_table['BIWClass'] != 3
+    #         correction_msk = np.logical_and(correction_msk, weather_hca)
+    #         correction_msk = np.logical_and(correction_msk, non_weather_biw)
+    #         data_table.loc[correction_msk, "hca"] = 10.0
+    #
+    #     # TODO Precious. Get original ZDR mask.
+    #     data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
+    #     data_table["hca_bio"] = data_table["hca"] == 10.0
+    #     data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
+    #
+    #     data_table["height_bin_meters"] = (np.floor(
+    #         data_table["height"] / height_binsize) + 1) * height_binsize - height_binsize / 2
+    #     data_table["height_bin_meters"] *= 1000
+    #
+    #     # Apply bird-insect classifier. -1 is non-bio, 1 is bird and 0 is insects.
+    #     echo_mask = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
+    #     X = data_table.loc[
+    #         echo_mask, ['differential_reflectivity', 'differential_phase', 'cross_correlation_ratio']]
+    #     X.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
+    #     X.rename(columns={"differential_phase": "pdp"}, inplace=True)
+    #     X.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
+    #     data_table['BIClass'], data_table['BIProb'] = -1, -1
+    #     if not X.empty:
+    #         bi_class, bi_probs = classify_echoes(X, clf_file, norm_stats_file)
+    #         data_table.loc[echo_mask, 'BIClass'] = bi_class
+    #         data_table.loc[echo_mask, 'BIProb'] = bi_probs[:, 1]
+    #         # data_table.loc[echo_mask, 'BIClass'] = classify_echoes(X, clf_file, norm_stats_path=norm_stats_file)
 
 
     # VAD wind profile
@@ -523,10 +523,10 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
     figure_prefix = os.path.splitext(radar_data_file)[0]
 
     if match_radar_and_sounding_grid:
-        VisualizeWinds(vad_profiles_job_interp, gt_wind_df_interp, 1100, description_jobs, title_str, prop_str,
+        VisualizeWinds(vad_profiles_job_interp, gt_wind_df_interp, max_height_VAD, description_jobs, title_str, prop_str,
                        figure_dir, figure_prefix, save_wind_figure)
         return vad_profiles_job_interp, gt_wind_df_interp, echo_dist_VAD
 
-    VisualizeWinds(vad_profiles_job, gt_wind_df, 1100, description_jobs, title_str, prop_str,
+    VisualizeWinds(vad_profiles_job, gt_wind_df, max_height_VAD, description_jobs, title_str, prop_str,
                    figure_dir, figure_prefix, save_wind_figure, figure_suffix=gt_desc)
     return vad_profiles_job, gt_wind_df, echo_dist_VAD
