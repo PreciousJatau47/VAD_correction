@@ -65,7 +65,7 @@ def GetFileListRadar(batch_folder_path, start_day, stop_day, date_pattern):
 
 def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l3, l3_files_dic, max_range,
                      height_binsize=0.04, clf_file=None, norm_stats_file=None, correct_hca_weather=False,
-                     max_height_VAD=1000, biw_norm_stats_file=None, biw_clf_file=None, allowed_el_hca = None):
+                     max_height_correction=1000, biw_norm_stats_file=None, biw_clf_file=None, allowed_el_hca=None):
     # Read radar volume.
     try:
         print("Opening ", os.path.join(batch_folder_path_radar, radar_subpath))
@@ -100,7 +100,7 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
 
         # Correct HCA's misclassification of birds as weather within VAD region.
         # if weather hca, and non-weather biw, and within collection region, set to biological
-        correction_msk = data_table["height"] < max_height_VAD
+        correction_msk = data_table["height"] < max_height_correction
         weather_hca = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
         non_weather_biw = data_table['BIWClass'] != 3
         correction_msk = np.logical_and(correction_msk, weather_hca)
@@ -110,20 +110,8 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
     data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
     data_table["hca_bio"] = data_table["hca"] == 10.0
     data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
-
-    # TODO(pjatau) delete after a few runs
-    data_table["height_bin_meters_old"] = (np.floor(
-        data_table["height"] / height_binsize) + 1) * height_binsize - height_binsize / 2
-    data_table["height_bin_meters_old"] *= 1000
-
     data_table["height_bin_meters"] = (data_table[
                                            "height"] // height_binsize * height_binsize + height_binsize / 2) * 1000
-
-    # TODO(pjatau) delete after a few runs
-    this_ser = data_table["height_bin_meters_old"]
-    other_ser = data_table["height_bin_meters"]
-    status = np.isclose(a=this_ser, b=other_ser, rtol=0.1, atol=0.1)
-    assert np.logical_and.reduce(status)
 
     echo_mask = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
     X = data_table.loc[
@@ -135,8 +123,7 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
     if not X.empty:
         bi_class, bi_probs = classify_echoes(X, clf_file, norm_stats_file)
         data_table.loc[echo_mask, 'BIClass'] = bi_class
-        data_table.loc[echo_mask, 'BIProb'] = bi_probs[:,1]
-
+        data_table.loc[echo_mask, 'BIProb'] = bi_probs[:, 1]
 
     return data_table, radar_obj, hca_vol
 
