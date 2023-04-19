@@ -252,7 +252,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                                                               batch_folder_path_l3, l3_files_dic, max_range=max_range,
                                                               clf_file=clf_file, norm_stats_file=norm_stats_file,
                                                               correct_hca_weather=correct_hca_weather,
-                                                              max_height_VAD=1000,
+                                                              max_height_correction=max_height_VAD,
                                                               biw_norm_stats_file=biw_norm_stats_file,
                                                               biw_clf_file=biw_clf_file, allowed_el_hca=allowed_el_hca,
                                                               height_binsize=height_binsize)
@@ -539,7 +539,7 @@ def AnalyzeWindBatch(batch_folder, radar_folder, level3_folder, start_day, stop_
                                                                   max_range=max_range,
                                                                   clf_file=clf_file, norm_stats_file=norm_stats_file,
                                                                   correct_hca_weather=correct_hca_weather,
-                                                                  max_height_VAD=1000,
+                                                                  max_height_correction=max_height_VAD,
                                                                   biw_norm_stats_file=biw_norm_stats_file,
                                                                   biw_clf_file=biw_clf_file)
 
@@ -628,7 +628,7 @@ def GetEchoDistributionBatch(batch_folder, radar_folder, level3_folder, start_da
                                                               batch_folder_path_l3, l3_files_dic, max_range=max_range,
                                                               clf_file=clf_file, norm_stats_file=norm_stats_file,
                                                               correct_hca_weather=correct_hca_weather,
-                                                              max_height_VAD=1000,
+                                                              max_height_correction=1000,
                                                               biw_norm_stats_file=biw_norm_stats_file,
                                                               biw_clf_file=biw_clf_file)
 
