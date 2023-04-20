@@ -1007,6 +1007,75 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     return
 
 
+def VisualizeProfilesScan(wind_profiles, wind_file_no_ext, figure_dir, save_plots=False):
+    out_dir = os.path.join(figure_dir, 'vad_profiles')
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
+
+    # Plot options
+    line_width = 2
+    max_height = 1500
+
+    # VAD probability profile.
+    fig, ax = plt.subplots()
+    idx_profile = np.isfinite(wind_profiles["mean_prob_biological"])
+    ax.plot(wind_profiles["mean_prob_biological"][idx_profile], wind_profiles["height_m"][idx_profile],
+            linewidth=line_width)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, max_height)
+    ax.grid(True)
+    ax.set_xlabel("BIRC probability (no unit)")
+    ax.set_ylabel("Height (m)")
+    ax.set_title("VAD probability profile")
+    plt.tight_layout()
+    if save_plots:
+        plt.savefig(os.path.join(out_dir, ''.join([wind_file_no_ext, '_probs_profile'])), dpi=200)
+
+    # VAD Census profile.
+    num_birds_height = wind_profiles["num_birds_height"] / 1000
+    num_insects_height = wind_profiles["num_insects_height"] / 1000
+
+    fig, ax = plt.subplots()
+    idx_birds = np.isfinite(num_birds_height)
+    idx_insects = np.isfinite(num_insects_height)
+    max_pop = max(np.nanmax(num_birds_height), np.nanmax(num_insects_height))
+    max_pop = max(max_pop, 16500 / 1000)
+
+    ax.plot(num_birds_height[idx_birds], wind_profiles["height_m"][idx_birds], label='birds', c='b',
+            linewidth=line_width)
+    ax.plot(num_insects_height[idx_insects], wind_profiles["height_m"][idx_insects], label='insects',
+            c='r', linewidth=line_width)
+    ax.set_xlim(0, max_pop)
+    ax.set_ylim(0, max_height)
+    ax.grid(True)
+    ax.set_xlabel(r"Number of gates ($\times\,10^3$ )")
+    ax.set_ylabel("Height (m)")
+    ax.set_title("Bird and insect census")
+    plt.legend()
+    plt.tight_layout()
+    if save_plots:
+        plt.savefig(os.path.join(out_dir, ''.join([wind_file_no_ext, '_census_profile'])), dpi=200)
+
+    # Biological bias profile.
+    fig, ax = plt.subplots()
+    idx_profile = np.isfinite(wind_profiles["airspeed_biological"])
+    ax.plot(wind_profiles["airspeed_biological"][idx_profile], wind_profiles["height_m"][idx_profile],
+            linewidth=line_width)
+    ax.set_xlim(0, 8)
+    ax.set_ylim(0, max_height)
+    ax.grid(True)
+    ax.set_xlabel(r"$bias_{bio}$ (mps)")
+    ax.set_ylabel("Height (m)")
+    ax.set_title("$bias_{bio}$")
+    plt.tight_layout()
+    if save_plots:
+        plt.savefig(os.path.join(out_dir, ''.join([wind_file_no_ext, '_bias_bio_profile'])), dpi=200)
+    plt.show()
+
+    return
+
+
+
 def Main():
     # Inputs
     airspeed_log_dir = r'./batch_analysis_logs'
@@ -1073,9 +1142,13 @@ def Main():
     # constraints = [("height_m", 700, 1000), ("insect_prop_bio", 33.33, 66.66), ("airspeed_insects", 12.5, 19),
     #                ("airspeed_birds", 12, 22), ("prop_weather", 0, MAX_WEATHER_PROP),
     #                ("prop_weather_scan", 0, MAX_WEATHER_PROP_SCAN)]
-    constraints = [("file_name", ["KOHX20180503_180336_V06"], True)]
-    wind_error_filt = FilterFlightspeeds(wind_error_constrained, constraints)
-    print(np.unique(wind_error_filt.file_name))
+
+    # target_file_name = "KOHX20180503_180336_V06" #"KOHX20180503_111205_V06"
+    # constraints = [("file_name", [target_file_name], True)]
+    # wind_error_filt = FilterFlightspeeds(wind_error_constrained, constraints)
+    # print(np.unique(wind_error_filt.file_name))
+    # VisualizeProfilesScan(wind_profiles=wind_error_filt, wind_file_no_ext=target_file_name, figure_dir="./",
+    #                       save_plots=False)
 
     return
 

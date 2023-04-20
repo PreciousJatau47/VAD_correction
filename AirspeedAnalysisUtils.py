@@ -4,6 +4,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from VADMaskEnum import VADMask, GetVADMaskDescription
+from WindUtils import CalcPolarDiffVec
 from TrueWindEnum import *
 
 
@@ -26,56 +27,6 @@ def WindError(x1, y1, x2, y2, error_fn, reduce_fn):
     return reduced_error, scores, x_scores
 
 
-def VisualizeProfilesScan(vel_profiles, wind_file_no_ext, figure_dir, save_plots=False):
-    out_dir = os.path.join(figure_dir, 'vad_profiles')
-    if not os.path.isdir(out_dir):
-        os.makedirs(out_dir)
-
-    # Plot options
-    line_width = 2
-    max_height = 1100
-
-    # VAD probability profile.
-    fig, ax = plt.subplots()
-    idx_profile = np.isfinite(vel_profiles["mean_prob_biological"])
-    ax.plot(vel_profiles["mean_prob_biological"][idx_profile], vel_profiles["height_m"][idx_profile], linewidth=line_width)
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, max_height)
-    ax.grid(True)
-    ax.set_xlabel("Wind tracing score (no unit)")
-    ax.set_ylabel("Height (m)")
-    ax.set_title("VAD wind tracing profile")
-    plt.tight_layout()
-    if save_plots:
-        plt.savefig(os.path.join(out_dir, ''.join([wind_file_no_ext, '_probs_profile'])), dpi=200)
-
-    # VAD Census profile.
-    num_birds_height = vel_profiles["num_birds_height"] / 1000
-    num_insects_height = vel_profiles["num_insects_height"] / 1000
-
-    fig, ax = plt.subplots()
-    idx_birds = np.isfinite(num_birds_height)
-    idx_insects = np.isfinite(num_insects_height)
-    max_pop = max(np.nanmax(num_birds_height), np.nanmax(num_insects_height))
-    max_pop = max(max_pop, 16500 / 1000)
-
-    ax.plot(num_birds_height[idx_birds], vel_profiles["height_m"][idx_birds], label='birds', c='b',
-            linewidth=line_width)
-    ax.plot(num_insects_height[idx_insects], vel_profiles["height_m"][idx_insects], label='insects',
-            c='r', linewidth=line_width)
-    ax.set_xlim(0, max_pop)
-    ax.set_ylim(0, max_height)
-    ax.grid(True)
-    ax.set_xlabel(r"Number of gates ($\times\,10^3$ )")
-    ax.set_ylabel("Height (m)")
-    ax.set_title("Bird and insect census")
-    plt.legend()
-    plt.tight_layout()
-    if save_plots:
-        plt.savefig(os.path.join(out_dir, ''.join([wind_file_no_ext, '_census_profile'])), dpi=200)
-    # plt.show()
-
-    return
 
 def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist, figure_dir, debug_plots=False):
     # Sounding
@@ -113,10 +64,6 @@ def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist, figure_dir, debug_
     vel_profiles['prop_birds'] = echo_dist['bird']
     vel_profiles['prop_insects'] = echo_dist['insects']
     vel_profiles['prop_weather'] = echo_dist['weather']
-
-    if debug_plots:
-        VisualizeProfilesScan(vel_profiles=vel_profiles, wind_file_no_ext=wind_file_no_ext, figure_dir=figure_dir,
-                              save_plots=False)
 
     return vel_profiles
 
