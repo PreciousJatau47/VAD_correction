@@ -50,11 +50,13 @@ def ImposeConstraints(df, constraints, idx=True):
 
     for constraint in constraints:
         if constraint[0] == 'file_name':
+            _, file_names, include_files = constraint
             idx_files = False
-            for file_name in constraint[1]:
+            for file_name in file_names:
                 idx_files = np.logical_or(idx_files, df["file_name"] == file_name)
 
-            idx_files = np.logical_not(idx_files)
+            if not include_files:
+                idx_files = np.logical_not(idx_files)
             idx = np.logical_and(idx, idx_files)
         else:
             if len(constraint) == 3:
@@ -260,8 +262,7 @@ def plot_weekly_averages_with_vector_field(weekly_data, day_starts, noon_s_midni
     return
 
 
-def LoadWindError(airspeed_log_dir, airspeed_files, target_echoes, vad_score_type, MAX_WEATHER_PROP,
-                  MAX_WEATHER_PROP_SCAN, remove_cases_list=[]):
+def LoadWindError(airspeed_log_dir, airspeed_files, target_echoes, vad_score_type, constraints=[]):
     wind_error = pd.DataFrame()
     for airspeed_file in airspeed_files:
         wind_error_path = os.path.join(airspeed_log_dir, airspeed_file)
@@ -309,12 +310,10 @@ def LoadWindError(airspeed_log_dir, airspeed_files, target_echoes, vad_score_typ
         print('Using insect proportion for the whole scan. ')
 
     # Filter wind error data.
-    constraints = [("prop_weather", 0, MAX_WEATHER_PROP), ("prop_weather_scan", 0, MAX_WEATHER_PROP_SCAN),
-                   ('file_name', remove_cases_list)]
     idx_constraints = ImposeConstraints(wind_error, constraints)
     wind_error_constrained = wind_error[idx_constraints].reset_index(drop=True)
 
-    return wind_error_constrained, constraints
+    return wind_error_constrained
 
 
 def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plots, figure_summary_dir,
@@ -1036,13 +1035,11 @@ def Main():
     wind_source_desc = wind_source_desc.replace(' ', '_')
 
     # Load wind error
-    wind_error_constrained, constraints = LoadWindError(airspeed_log_dir=airspeed_log_dir,
-                                                        airspeed_files=airspeed_files,
-                                                        target_echoes=target_echoes,
-                                                        vad_score_type=vad_score,
-                                                        MAX_WEATHER_PROP=MAX_WEATHER_PROP,
-                                                        MAX_WEATHER_PROP_SCAN=MAX_WEATHER_PROP_SCAN,
-                                                        remove_cases_list=remove_cases_list)
+    constraints = [("prop_weather", 0, MAX_WEATHER_PROP), ("prop_weather_scan", 0, MAX_WEATHER_PROP_SCAN),
+                   ('file_name', remove_cases_list, False)]
+    wind_error_constrained = LoadWindError(airspeed_log_dir=airspeed_log_dir, airspeed_files=airspeed_files,
+                                           target_echoes=target_echoes, vad_score_type=vad_score,
+                                           constraints=constraints)
 
     # Visualize flight speeds
     color_weather = wind_error_constrained['prop_weather']
@@ -1076,7 +1073,7 @@ def Main():
     # constraints = [("height_m", 700, 1000), ("insect_prop_bio", 33.33, 66.66), ("airspeed_insects", 12.5, 19),
     #                ("airspeed_birds", 12, 22), ("prop_weather", 0, MAX_WEATHER_PROP),
     #                ("prop_weather_scan", 0, MAX_WEATHER_PROP_SCAN)]
-    constraints = [("height_m", 732, 734)]
+    constraints = [("file_name", ["KOHX20180503_180336_V06"], True)]
     wind_error_filt = FilterFlightspeeds(wind_error_constrained, constraints)
     print(np.unique(wind_error_filt.file_name))
 
