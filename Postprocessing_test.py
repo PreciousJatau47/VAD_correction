@@ -1,9 +1,40 @@
 import unittest
 import numpy as np
 import pandas as pd
-from Postprocessing import prepare_pcolor_grid_from_series, prepare_weekly_data_for_pcolor_plot
+from Postprocessing import prepare_pcolor_grid_from_series, prepare_weekly_data_for_pcolor_plot, ImposeConstraints
+
 
 class TestPostprocessing(unittest.TestCase):
+    def test_ImposeConstraints(self):
+        df = pd.DataFrame({'file_name': ['a', 'b', 'c'], 'prop_weather': [1, 10, 90]})
+
+        # Filter, keep target files
+        constraints = [('file_name', ['a', 'c'], True)]
+        exp_idx = np.array([True, False, True])
+        pred_idx = ImposeConstraints(df=df, constraints=constraints)
+        status = np.logical_and.reduce(np.array_equal(exp_idx, pred_idx))
+        self.assertTrue(status)
+
+        # Filter, exclude target files
+        constraints = [('file_name', ['a', 'c'], False)]
+        exp_idx = np.array([False, True, False])
+        pred_idx = ImposeConstraints(df=df, constraints=constraints)
+        status = np.logical_and.reduce(np.array_equal(exp_idx, pred_idx))
+        self.assertTrue(status)
+
+        # Multiple contraints
+        constraints = [('file_name', ['a', 'c'], False), ('prop_weather', 0, 9)]
+        exp_idx = np.array([False, False, False])
+        pred_idx = ImposeConstraints(df=df, constraints=constraints)
+        status = np.logical_and.reduce(np.array_equal(exp_idx, pred_idx))
+        self.assertTrue(status)
+
+        constraints = [('file_name', ['a', 'c'], True), ('prop_weather', 0, 10.5)]
+        exp_idx = np.array([True, False, False])
+        pred_idx = ImposeConstraints(df=df, constraints=constraints)
+        status = np.logical_and.reduce(np.array_equal(exp_idx, pred_idx))
+        self.assertTrue(status)
+
     def test_prepare_pcolor_grid_from_series(self):
         df = pd.DataFrame({'x': [0, 0, 1, 1], 'y': [0, 1, 0, 1], 'z': [1, 2, 3, 4]})
         uniqueX = [0, 1]
@@ -52,8 +83,6 @@ class TestPostprocessing(unittest.TestCase):
             pred = wD[key]['z'].astype(int)
             self.assertTrue(np.array_equal(exp_weekly_data[key]['z'], pred))
             self.assertEqual(exp_xlab, xLabs)
-
-
 
 
 if __name__ == "__main__":
