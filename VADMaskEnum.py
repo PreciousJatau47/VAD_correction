@@ -6,6 +6,7 @@ class VADMask(enum.Enum):
     insects = 2
     birds = 3
     weather = 4
+    external_l3_vad_profile = 5
 
 def GetVADMaskDescription(in_enum):
     if in_enum == VADMask.default:
@@ -18,3 +19,5 @@ def GetVADMaskDescription(in_enum):
         return "birds"
     elif in_enum == VADMask.weather:
         return "weather"
+    elif in_enum == VADMask.external_l3_vad_profile:
+        return "l3_vad"
