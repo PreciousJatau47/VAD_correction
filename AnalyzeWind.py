@@ -7,6 +7,7 @@ from NexradUtils import *
 from VADMaskEnum import VADMask
 from TrueWindEnum import *
 from VADUtils import VADWindProfile
+from L3VADReader import GetL3VADWindProfile
 import GeneralUtils as gu
 from collections import Counter
 
@@ -31,9 +32,9 @@ def VisualizeWinds(vad_profiles_job, sounding_wind_df, max_height, description_j
 
     # TODO add biological echoes to colour wheel
     red_color_wheel = {VADMask.weather: "gold", VADMask.insects: "tomato", VADMask.birds: "lime",
-                       VADMask.biological: "fuchsia"}
+                       VADMask.biological: "fuchsia", VADMask.external_l3_vad_profile: "yellow"}
     blue_color_wheel = {VADMask.weather: "deepskyblue", VADMask.insects: "blueviolet", VADMask.birds: "cornflowerblue",
-                        VADMask.biological: "darkslategray"}
+                        VADMask.biological: "darkslategray", VADMask.external_l3_vad_profile: "darkorchid"}
 
     # Plot for speed and direction.
     fig, ax = plt.subplots(1, 2)
@@ -235,6 +236,8 @@ def InterpolateSoundingWind(sounding_df, height_grid_interp, max_height_diff, ma
 
 
 def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
+    if vad_df.empty:
+        return vad_df
     height_grid = vad_df['height']
     windU = vad_df['wind_U']
     windV = vad_df['wind_V']
@@ -268,10 +271,6 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
     df_interp.loc[range(len(vad_df)), 'mean_ref'] = vad_df['mean_ref']
     df_interp['mean_prob'] = np.nan
     df_interp.loc[range(len(vad_df)), 'mean_prob'] = vad_df['mean_prob']
-
-    # TODO(pjatau) remove this after a few runs
-    assert round(df_interp['wind_speed']).equals(round(spd_interp))
-    assert round(df_interp['wind_direction']).equals(round(dirn_interp))
 
     df_interp = df_interp.sort_values(by=['height'])
 
@@ -318,7 +317,7 @@ def PrepareAnalyzeWindInputs(radar_data_file, batch_folder, radar_data_folder, h
         return radar_data_file, radar_data_folder, None, None, None
 
 
-def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sounding, sounding_log_dir,
+def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, l3_vad_folder, radar_t_sounding, sounding_log_dir,
                 norm_stats_file, clf_file, vad_jobs, figure_dir, max_range=300, max_height_VAD=1000,
                 match_radar_and_sounding_grid=True, save_wind_figure=False, radar=None, hca_vol=None, data_table=None,
                 l3_filelist=None, vad_debug_params=None, ground_truth_source=WindSource.sounding, rap_folder=None,
@@ -470,17 +469,36 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
 
     vad_profiles_job = {}
     for vad_mask in vad_jobs:
-        wind_profile_vad = VADWindProfile(signal_func, vad_heights, vad_mask, data_table,
-                                          showDebugPlot=show_vad_plot, use_weights=use_vad_weights,
-                                          clf_purity_threshold=clf_purity_threshold,
-                                          min_required_nsamples=min_required_nsamples)
+        if vad_mask == VADMask.external_l3_vad_profile:
+            l3_vad_time = '{}-{}-{}/{}{}'.format(year, month, day, hh, mm)
 
+            try:
+                wind_profile_vad = GetL3VADWindProfile(local_path=l3_vad_folder, radar_id=radar_name, time=l3_vad_time,
+                                                       height_grid_m=vad_heights, height_binsize_m=height_binsize_m)
+            except Exception as e:
+                print("An error occured in GetL3VADWindProfile(): ", str(e),"\nSkipping to next iteration.")
+                wind_profile_vad = pd.DataFrame(
+                    {'height': [-999], 'wind_direction': [np.nan], 'wind_speed': [np.nan], 'rms_error': [np.nan],
+                     'divergence': [np.nan], 'slant_range': [np.nan], 'elev_angle': [np.nan], 'altitude': [np.nan],
+                     'num_samples': [np.nan], 'mean_ref': [np.nan], 'mean_prob': [np.nan], 'height_m': [np.nan],
+                     'wind_U': [np.nan], 'wind_V': [np.nan]})
+        else:
+            wind_profile_vad = VADWindProfile(signal_func, vad_heights, vad_mask, data_table,
+                                              showDebugPlot=show_vad_plot, use_weights=use_vad_weights,
+                                              clf_purity_threshold=clf_purity_threshold,
+                                              min_required_nsamples=min_required_nsamples)
         vad_profiles_job[vad_mask] = wind_profile_vad
 
     # Interpolate wind components.
     max_height = 1.1 * max_height_VAD  # meters.
     max_height_diff = 250  # meters.
-    height_grid_interp = wind_profile_vad['height']
+
+    ref_job_interp = vad_jobs[0]
+    for job in vad_jobs:
+        if job != VADMask.external_l3_vad_profile:
+            ref_job_interp = job
+
+    height_grid_interp = vad_profiles_job[ref_job_interp]['height']
     height_grid_interp = height_grid_interp[height_grid_interp < max_height]
 
     # Match, interpolate VAD and sounding/rap grid
@@ -519,7 +537,8 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, radar_t_sou
         gt_loc_desc, gt_desc)
 
     description_jobs = {VADMask.biological: ("bio", "."), VADMask.insects: ("ins", "2"),
-                        VADMask.weather: ("wea", "d"), VADMask.birds: ("bir", "^")}
+                        VADMask.weather: ("wea", "d"), VADMask.birds: ("bir", "^"),
+                        VADMask.external_l3_vad_profile: ('l3', '8')}
     figure_prefix = os.path.splitext(radar_data_file)[0]
 
     if match_radar_and_sounding_grid:

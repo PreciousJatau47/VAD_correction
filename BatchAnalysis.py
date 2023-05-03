@@ -139,14 +139,12 @@ def TestAccumulateAndAverage():
         prev_scan_time = radar_scan_time
 
 
-def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_day, date_pattern, max_range,
-                    max_height_VAD, time_window, clf_file, radar_t_sounding, sounding_log_dir,
+def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, level3_vad_folder, start_day, stop_day, date_pattern,
+                    max_range, max_height_VAD, time_window, clf_file, radar_t_sounding, sounding_log_dir,
                     norm_stats_file, vad_jobs, figure_dir, vad_sounding_dir, echo_count_log_dir, save_ppi_plots,
-                    force_output_logging,
-                    ground_truth_source=WindSource.sounding,
-                    rap_folder=None, correct_hca_weather=False, biw_norm_stats_file=None,
-                    biw_clf_file=None, log_dir='./', experiment_name='', allowed_el_hca=None, use_vad_weights=False,
-                    clf_purity_threshold=0.5,
+                    force_output_logging, ground_truth_source=WindSource.sounding, rap_folder=None,
+                    correct_hca_weather=False, biw_norm_stats_file=None, biw_clf_file=None, log_dir='./',
+                    experiment_name='', allowed_el_hca=None, use_vad_weights=False, clf_purity_threshold=0.5,
                     min_required_nsamples=720, height_binsize=0.04):
 
     # Echo count options
@@ -304,6 +302,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
                     target_file = target_folder[1]
                     target_file_no_ext = os.path.splitext(target_file)[0]
                     target_folder = os.path.join(radar_folder, batch_folder, target_folder[0])
+                    l3_vad_folder = os.path.join(level3_vad_folder, batch_folder, target_file_no_ext[4:12])
 
                     if correct_hca_weather:
                         wind_figure_dir = os.path.join(figure_dir, batch_folder, curr_day, 'radar_sounding_wind',
@@ -316,11 +315,16 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, start_day, stop_d
 
                     # Analyze wind. Takes ~16s.
                     print('Analyzing wind for ', target_file, ' ....')
-                    vad_profiles, sounding_df, echo_dist_VAD = AnalyzeWind(target_file, target_folder,
-                                                                           batch_folder_path_l3,
-                                                                           radar_t_sounding,
-                                                                           sounding_log_dir, norm_stats_file, clf_file,
-                                                                           vad_jobs, figure_dir=wind_figure_dir,
+                    vad_profiles, sounding_df, echo_dist_VAD = AnalyzeWind(radar_data_file=target_file,
+                                                                           radar_data_folder=target_folder,
+                                                                           hca_data_folder=batch_folder_path_l3,
+                                                                           l3_vad_folder=l3_vad_folder,
+                                                                           radar_t_sounding=radar_t_sounding,
+                                                                           sounding_log_dir=sounding_log_dir,
+                                                                           norm_stats_file=norm_stats_file,
+                                                                           clf_file=clf_file,
+                                                                           vad_jobs=vad_jobs,
+                                                                           figure_dir=wind_figure_dir,
                                                                            max_range=max_range,
                                                                            max_height_VAD=max_height_VAD,
                                                                            match_radar_and_sounding_grid=True,
@@ -682,6 +686,7 @@ Enforce format for batch_folder.
 def Main():
     level3_folder = "./level3_data"
     radar_folder = "./radar_data"
+    level3_vad_folder = "./level3_VAD_wind_profiles"
     allowed_el_hca = {0.5: "N0H", 1.5: "N1H", 2.5: "N2H", 3.5: "N3H"}
     force_output_logging = True
     output_log_dir = "./analysis_output_logs"
@@ -747,20 +752,19 @@ def Main():
             print("clf_purity_threshold: ", clf_purity_threshold)
 
             E2EWindAnalysis(batch_folder=batch_folder, radar_folder=radar_folder, level3_folder=level3_folder,
-                            start_day=start_day, stop_day=stop_day, date_pattern=date_pattern, max_range=max_range,
-                            max_height_VAD=max_height_VAD, time_window=time_window, clf_file=clf_file,
-                            radar_t_sounding=radar_t_sounding, sounding_log_dir=sounding_log_dir,
-                            norm_stats_file=norm_stats_file, vad_jobs=vad_jobs, figure_dir=figure_dir,
-                            vad_sounding_dir=vad_sounding_output_dir, echo_count_log_dir=output_log_dir,
-                            save_ppi_plots=save_ppi_plots, force_output_logging=force_output_logging,
-                            ground_truth_source=ground_truth_wind, rap_folder=rap_folder,
-                            correct_hca_weather=correct_hca_weather,
+                            level3_vad_folder=level3_vad_folder, start_day=start_day, stop_day=stop_day,
+                            date_pattern=date_pattern, max_range=max_range, max_height_VAD=max_height_VAD,
+                            time_window=time_window, clf_file=clf_file, radar_t_sounding=radar_t_sounding,
+                            sounding_log_dir=sounding_log_dir, norm_stats_file=norm_stats_file, vad_jobs=vad_jobs,
+                            figure_dir=figure_dir, vad_sounding_dir=vad_sounding_output_dir,
+                            echo_count_log_dir=output_log_dir, save_ppi_plots=save_ppi_plots,
+                            force_output_logging=force_output_logging, ground_truth_source=ground_truth_wind,
+                            rap_folder=rap_folder, correct_hca_weather=correct_hca_weather,
                             biw_norm_stats_file=biw_norm_stats_file, biw_clf_file=biw_clf_file,
-                            log_dir=e2e_analysis_log_dir,
-                            experiment_name=experiment_name, allowed_el_hca=allowed_el_hca,
-                            use_vad_weights=use_vad_weights,
-                            clf_purity_threshold=clf_purity_threshold, min_required_nsamples=min_req_nsamples_vad,
-                            height_binsize=0.04)
+                            log_dir=e2e_analysis_log_dir, experiment_name=experiment_name,
+                            allowed_el_hca=allowed_el_hca,
+                            use_vad_weights=use_vad_weights, clf_purity_threshold=clf_purity_threshold,
+                            min_required_nsamples=min_req_nsamples_vad, height_binsize=0.04)
 
     return
 
