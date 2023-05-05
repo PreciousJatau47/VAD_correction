@@ -35,6 +35,7 @@ def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist, figure_dir, debug_
     wind_file_no_ext = os.path.splitext(wind_file)[0]
     vel_profiles['file_name'] = wind_file_no_ext
     vel_profiles = vel_profiles.drop_duplicates(subset='height_m', keep='last')
+    vel_profiles['height_m'] = round(vel_profiles['height_m'])
 
     # VAD
     vad_vel_cols_base = ["height", "wind_speed", "wind_direction", "num_samples"]
@@ -58,12 +59,14 @@ def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist, figure_dir, debug_
         echo_df = vad[echo].loc[:, vad_vel_cols]
         echo_df.rename(columns=dict(zip(vad_vel_cols, new_cols)), inplace=True)
         echo_df = echo_df.drop_duplicates(subset='height_m', keep='last')
+        echo_df['height_m'] = round(echo_df['height_m'])
 
         vel_profiles = pd.merge(vel_profiles, echo_df, on="height_m", how="outer")
 
     vel_profiles['prop_birds'] = echo_dist['bird']
     vel_profiles['prop_insects'] = echo_dist['insects']
     vel_profiles['prop_weather'] = echo_dist['weather']
+    vel_profiles['file_name'] = wind_file_no_ext
 
     return vel_profiles
 
