@@ -463,7 +463,8 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, l3_vad_fold
         show_vad_plot = vad_debug_params['show_plot']
     else:
         min_height_bin = np.min(data_table["height_bin_meters"])
-        vad_heights = np.arange(min_height_bin, max_height_VAD, height_binsize_m)
+        max_height_bin = 1.1 * max_height_VAD if match_radar_and_sounding_grid else max_height_VAD
+        vad_heights = np.arange(min_height_bin, max_height_bin, height_binsize_m)
         # vad_heights = np.array([480])
         show_vad_plot = False
 
@@ -491,7 +492,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, l3_vad_fold
 
     # Interpolate wind components.
     max_height = 1.1 * max_height_VAD  # meters.
-    max_height_diff = 250  # meters.
+    max_height_diff = 300  # meters.
 
     ref_job_interp = vad_jobs[0]
     for job in vad_jobs:
