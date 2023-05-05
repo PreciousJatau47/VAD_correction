@@ -498,23 +498,44 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, l3_vad_fold
         if job != VADMask.external_l3_vad_profile:
             ref_job_interp = job
 
-    height_grid_interp = vad_profiles_job[ref_job_interp]['height']
-    height_grid_interp = height_grid_interp[height_grid_interp < max_height]
-
     # Match, interpolate VAD and sounding/rap grid
     if match_radar_and_sounding_grid:
+        # New sounding heights to be interpolated.
+        height_grid_interp = vad_profiles_job[ref_job_interp]['height']
+        height_grid_interp = height_grid_interp[height_grid_interp < max_height]
+
         gt_wind_df_interp = InterpolateSoundingWind(sounding_df=gt_wind_df,
                                                     height_grid_interp=height_grid_interp,
                                                     max_height_diff=max_height_diff,
                                                     max_height=max_height)
+
+        # New VAD heights to be interpolated.
         height_grid_interp = gt_wind_df['HGHT']
         height_grid_interp = height_grid_interp[height_grid_interp < max_height]
         vad_profiles_job_interp = {}
+
         for vad_mask in vad_jobs:
-            vad_profiles_job_interp[vad_mask] = InterpolateVADWind(vad_df=vad_profiles_job[vad_mask],
-                                                                   height_grid_interp=height_grid_interp,
-                                                                   max_height_diff=max_height_diff,
-                                                                   max_height=max_height)
+            if vad_mask == VADMask.external_l3_vad_profile:
+                # Heights to be interpolated
+                height_grid_interp_l3 = pd.concat([gt_wind_df['HGHT'], pd.Series(vad_heights)], axis=0)
+                idx = np.logical_and(height_grid_interp_l3 >= 0, height_grid_interp_l3 < max_height)
+                height_grid_interp_l3 = height_grid_interp_l3[idx]
+                height_grid_interp_l3.sort_values(inplace=True)
+                height_grid_interp_l3 = height_grid_interp_l3.reset_index(drop=True)
+
+                vad_df = vad_profiles_job[vad_mask]
+                idx_vad = np.logical_and(np.isfinite(vad_df['wind_U']),np.isfinite(vad_df['wind_V']))
+                vad_df = vad_df[idx_vad].reset_index(drop=True)
+
+                vad_profiles_job_interp[vad_mask] = InterpolateVADWind(vad_df=vad_df,
+                                                                       height_grid_interp=height_grid_interp_l3,
+                                                                       max_height_diff=max_height_diff,
+                                                                       max_height=max_height)
+            else:
+                vad_profiles_job_interp[vad_mask] = InterpolateVADWind(vad_df=vad_profiles_job[vad_mask],
+                                                                       height_grid_interp=height_grid_interp,
+                                                                       max_height_diff=max_height_diff,
+                                                                       max_height=max_height)
 
     # Plots.
     height_msk = data_table["height_bin_meters"] < max_height_VAD
