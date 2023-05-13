@@ -277,14 +277,13 @@ def MergeRadarAndHCAUpdate(radar, hca_volume, maxRange):
     slice_store = dict(zip(hca_volume.keys(), [None for i in range(len(hca_volume))]))
 
     for radar_sweep_idx in range(n_sweeps):
-        radar_el = np.mean(radar.elevation['data'][radar.get_slice(radar_sweep_idx)])
-        radar_el = round(radar_el / 0.5) * 0.5
+        radar_el_default = np.mean(radar.elevation['data'][radar.get_slice(radar_sweep_idx)])
+        radar_el = round(radar_el_default / 0.5) * 0.5
 
         # build radar + hca table if radar elevation matches hca elevation
         if radar_el in hca_volume.keys():
             radar_range, radar_az_deg, _, data_slice, mask_slice, labels_slice, radar_mask = ReadRadarSliceUpdate(radar,
                                                                                                                   radar_sweep_idx)
-            print(np.nansum(radar_mask))
 
             # interpolate to common grid
             range_idxs = MatchGates(radar_range, range_common)
@@ -315,6 +314,10 @@ def MergeRadarAndHCAUpdate(radar, hca_volume, maxRange):
     data_tables = []
     for hca_el in hca_volume.keys():
         if slice_store[hca_el] == None:
+            continue
+
+        has_all_variables = np.logical_and.reduce(slice_store[hca_el][1])
+        if not has_all_variables:
             continue
 
         # Define common grid
@@ -368,8 +371,15 @@ def MergeRadarAndHCAUpdate(radar, hca_volume, maxRange):
         data_tables.append(data_table)
 
     # Merge tables
-    data_table = pd.concat(data_tables, axis=0)
-    # print(data_table.shape)
+    if data_tables:
+        data_table = pd.concat(data_tables, axis=0)
+    else:
+        data_table = pd.DataFrame(columns=['cross_correlation_ratio', 'differential_phase',
+                                           'differential_reflectivity', 'reflectivity', 'spectrum_width',
+                                           'velocity', 'mask_velocity', 'hca', 'hca_mask', 'azimuth', 'range',
+                                           'elevation'])
+
+    print(data_table.shape)
     return data_table
 
 

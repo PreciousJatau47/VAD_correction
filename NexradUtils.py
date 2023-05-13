@@ -86,6 +86,11 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
         return None, None, None
 
     data_table = MergeRadarAndHCAUpdate(radar_obj, hca_vol, max_range)
+    if data_table.empty:
+        print(
+            'Empty data table. True elevation angle might be far from expected elevation. Skipping to next iteration.')
+        return None, None, None
+
     data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
 
     if correct_hca_weather:
