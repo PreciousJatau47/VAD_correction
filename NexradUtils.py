@@ -70,8 +70,8 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
     try:
         print("Opening ", os.path.join(batch_folder_path_radar, radar_subpath))
         radar_obj = pyart.io.read_nexrad_archive(os.path.join(batch_folder_path_radar, radar_subpath))
-    except:
-        print("Read failed. Skipping to next iteration")
+    except Exception as e:
+        print("An error occured in reading radar file: ", str(e), "\nSkipping to next iteration.")
         return None, None, None
 
     # Read HCA volume.
