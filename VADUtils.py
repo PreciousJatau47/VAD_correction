@@ -157,7 +157,8 @@ def IsVADDistributionValid(az_cut, wind_dir, echo_type):
 
 def GetVADMask(data_table, echo_type, clf_purity_threshold=0.5):
     if echo_type == VADMask.biological:
-        vad_mask_arr = np.logical_and(data_table["hca_bio"], data_table["mask_velocity"])
+        vad_mask_arr = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
+        vad_mask_arr = np.logical_and(vad_mask_arr, data_table["mask_velocity"])
     elif echo_type == VADMask.insects:
         vad_mask_arr = np.logical_and(data_table["mask_differential_reflectivity"], data_table["hca_bio"])
         vad_mask_arr = np.logical_and(vad_mask_arr, data_table["BIProb"] < clf_purity_threshold)
