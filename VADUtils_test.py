@@ -11,7 +11,8 @@ class TestVADUtils(unittest.TestCase):
         p_in.close()
 
         # biological echoes.
-        exp_bio_mask = gu.logical_and(data_table['mask_velocity'], data_table['hca_bio'])
+        exp_bio_mask = gu.logical_and(data_table['mask_velocity'], data_table['hca_bio'],
+                                      data_table["mask_differential_reflectivity"])
         pred_bio_mask = GetVADMask(data_table, VADMask.biological)
         assert np.logical_and.reduce(exp_bio_mask == pred_bio_mask)
 
