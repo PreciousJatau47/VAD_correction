@@ -9,6 +9,11 @@ from scipy.optimize import least_squares, minimize
 from VADMaskEnum import *
 from WindUtils import Polar2CartesianComponentsDf, Cartesian2PolarComponentsDf
 
+font = {'family': 'DejaVu Sans',
+        'weight': 'bold',
+        'size': 12}
+plt.rc('font', **font)
+
 signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])
 MAX_FLOAT = sys.float_info.max
 MIN_FLOAT = sys.float_info.min
@@ -89,6 +94,19 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights=
 
     if showDebugPlot:
         print("estimated wind speed :", wind_speed, "mps.\nDirection: ", wind_dir, " degrees.")
+
+        fig, ax = plt.subplots()
+        ax.plot(pred_var, resp_var, label="$V_r$", color="blue")
+        ax.plot(pred_var, optimized_signal, label="$\hat{V}_{VAD}$", color="red", alpha=1.0)
+        ax.axvline(x=wind_dir, linestyle='dotted', color='red')
+        ax.axhline(y=wind_speed, linestyle='dotted', color='red')
+        ax.set_xlim(0, 360)
+        ax.set_xlabel("$\phi$ ($^{\circ}$)")
+        ax.set_ylabel("$V_r$ (m/s)")
+        ax.set_title("$\hat{V}_{VAD}$")
+        ax.grid(True)
+        ax.legend()
+        plt.tight_layout()
 
         fig, ax = plt.subplots(2, 2, figsize=(8.0, 6.4))
         ax[0, 0].plot(pred_var, resp_var, label="data", color="blue")
