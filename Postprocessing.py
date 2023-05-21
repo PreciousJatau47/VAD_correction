@@ -653,23 +653,40 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         plt.savefig(os.path.join(figure_summary_dir, "bias_bio_scatter.png"), dpi=200)
     ####################################################################################################################
 
-    height_ip_count = height_ip_df.groupby(["height_bins", "insect_prop_bins"], as_index=False).count()
-    height_ip_count = height_ip_count.loc[:,
-                      ["height_bins", "insect_prop_bins", "airspeed_diff", "airspeed_diff_bio_ins"]]
-    height_ip_count.rename(
-        columns={"airspeed_diff": "count_airspeed_diff", "airspeed_diff_bio_ins": "count_airspeed_diff_bio_ins"},
-        inplace=True)
-
     # Total cases with both bird and insect VADs.
     valid_cases_diff = np.logical_and(np.isfinite(height_ip_df['insect_prop_bins']),
                                       np.isfinite(height_ip_df['airspeed_diff']))
     total_valid_diff = np.sum(valid_cases_diff)
 
+    # Cases count by height-insect proportion
+    height_ip_count = height_ip_df.groupby(["height_bins", "insect_prop_bins"], as_index=False).count()
+    height_ip_count = height_ip_count.loc[:,
+                      ["height_bins", "insect_prop_bins", "airspeed_diff", "airspeed_diff_bio_ins",
+                       "airspeed_biological", "airspeed_insects", "airspeed_l3_vad"]]
+    variable_t_count = {"airspeed_diff": "count_airspeed_diff", "airspeed_diff_bio_ins": "count_airspeed_diff_bio_ins",
+                        "airspeed_biological": "count_airspeed_biological",
+                        "airspeed_insects": "count_airspeed_insects", "airspeed_l3_vad": "count_airspeed_l3_vad"}
+    height_ip_count.rename(columns=variable_t_count, inplace=True)
+    height_ip_count['cases_lost_bio_ins'] = height_ip_count["count_airspeed_biological"] - height_ip_count[
+        "count_airspeed_insects"]
+
+    # Mean by height-insect proportion
     height_ip_df = height_ip_df.groupby(["height_bins", "insect_prop_bins"], as_index=False).mean()
     height_ip_df = pd.merge(height_ip_df, height_ip_count, on=["height_bins", "insect_prop_bins"], how="inner")
-    idx_sufficient_samples = height_ip_df['count_airspeed_diff'] > 10  # All regions should have >= 10 samples
-    height_ip_df = height_ip_df.loc[idx_sufficient_samples, :]
 
+    # Filter out cases with insufficient samples
+    for var in variable_t_count:
+        print(variable_t_count[var])
+        idx_sufficient_samples = height_ip_df[variable_t_count[var]] > 10
+        height_ip_df.loc[np.logical_not(idx_sufficient_samples), var] = np.nan
+
+    idx_sufficient_samples = height_ip_df['count_airspeed_biological'] > 10
+    height_ip_df.loc[np.logical_not(idx_sufficient_samples), 'cases_lost_bio_ins'] = np.nan
+
+    height_ip_df['prop_cases_lost_bio_ins'] = height_ip_df['cases_lost_bio_ins'] * 100 / height_ip_df[
+            'count_airspeed_biological']
+
+    # Prepare height-insect prop. grids for pcolor plots
     unique_insect_prop_bins = np.arange(delta_insect_prop / 2, 100, delta_insect_prop)
     unique_height_bins = np.arange(delta_height / 2, 1000, delta_height)
     z_dict = {"airspeed_diff": height_ip_df['airspeed_diff'],
