@@ -325,6 +325,41 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     impurity_tolerance = Constants.IMPURITY_TOLERANCE
 
     idx_constraints = ImposeConstraints(wind_error, constraints)
+
+    # local VAD on biological echoes vs l3 VAD
+    if 'l3_vad_speed' in wind_error.columns:
+        speed_diff = wind_error['biological_speed'] - wind_error['l3_vad_speed']
+        dirn_diff = CalcSmallAngleDirDiffDf(dirn1=wind_error['biological_direction'],
+                                            dirn2=wind_error['l3_vad_direction'])
+        print("Local-L3 VAD speed difference: ", np.nanmedian(speed_diff))
+        print("Local-L3 VAD direction difference: ", np.nanmedian(dirn_diff))
+
+        plt.figure(figsize=(7, 5))
+        plt.hist(speed_diff, bins=50, density=True)
+        plt.xlim((-7.5, 7.5))
+        plt.grid(True)
+        plt.xlabel("Speed difference (m/s)")
+        plt.ylabel("Normalized counts (no units)")
+        plt.title("Speed difference between local and operational L3 VAD")
+        plt.tight_layout()
+        if save_plots:
+            plt.savefig(
+                os.path.join(figure_summary_dir, "speed_diff_VAD_comp"),
+                dpi=200)
+
+        plt.figure(figsize=(7, 5))
+        plt.hist(dirn_diff, bins=50, density=True)
+        plt.xlim((-180, 180))
+        plt.grid(True)
+        plt.xlabel(r"Direction difference ($^\circ$)")
+        plt.ylabel("Normalized counts (no units)")
+        plt.title("Direction difference between local and operational L3 VAD")
+        plt.tight_layout()
+        if save_plots:
+            plt.savefig(
+                os.path.join(figure_summary_dir, "dirn_diff_VAD_comp"),
+                dpi=200)
+
     idx_valid = np.isfinite(wind_error['airspeed_birds'])
     idx_valid = np.logical_and(idx_valid, np.isfinite(wind_error['airspeed_insects']))
     idx_valid = np.logical_and(idx_valid, idx_constraints)
