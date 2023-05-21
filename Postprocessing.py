@@ -625,7 +625,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
     # Height vs insect prop vs data analysis.
     height_ip_df = wind_error[
-        ["insect_prop_bio", "airspeed_birds", "airspeed_insects", "airspeed_biological", "height_m",
+        ["insect_prop_bio", "airspeed_birds", "airspeed_insects", "airspeed_biological", "airspeed_l3_vad", "height_m",
          "prop_weather_scan", "biological_wind_offset"]]
     height_ip_df["abs_bio_wind_offset"] = np.abs(height_ip_df["biological_wind_offset"])
     height_ip_df['airspeed_diff'] = height_ip_df['airspeed_birds'] - height_ip_df['airspeed_insects']
