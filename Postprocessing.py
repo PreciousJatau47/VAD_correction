@@ -692,6 +692,8 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     z_dict = {"airspeed_diff": height_ip_df['airspeed_diff'],
               "count_airspeed_diff": height_ip_df["count_airspeed_diff"],
               'airspeed_biological': height_ip_df['airspeed_biological'],
+              'airspeed_l3_vad': height_ip_df['airspeed_l3_vad'],
+              'count_airspeed_l3_vad': height_ip_df['count_airspeed_l3_vad'],
               'airspeed_insects': height_ip_df['airspeed_insects'],
               'airspeed_diff_bio_ins': height_ip_df['airspeed_diff_bio_ins']}  # monthly averages
 
@@ -764,16 +766,30 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     height_ip_df["abs_bio_off_U"], height_ip_df["abs_bio_off_V"] = \
         Polar2CartesianComponentsDf(spd=0.5, dirn=height_ip_df["abs_bio_wind_offset"])
 
-    title_str = "Averaged biological echo biases"
-    plot_averages_pcolor_with_vector_field(x=ins_prop_bins, y=unique_height_bins,
-                                           z=height_ip_grid['airspeed_biological'], cmap='jet',
-                                           xlab='insect prop bio [%]', ylab='height [m]', title_str=title_str,
-                                           out_dir=figure_summary_dir,
-                                           out_name="airspeed_biological_height_insectprop.png", min_z=0,
-                                           max_z=max_airspeed, vec_df=height_ip_df, x_col="insect_prop_bins",
-                                           y_col="height_bins", u_col="abs_bio_off_U", v_col="abs_bio_off_V",
-                                           xlim=(0, 100), ylim=(0, 1000), cbar_label="[m/s]",
-                                           save_plot=save_plots)
+    title_str = "VAD wind biases averaged by wind tracing score"
+    plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins,
+                         z=height_ip_grid['airspeed_biological'], cmap='jet',
+                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir,
+                         out_name="airspeed_biological_height_insectprop.png", min_z=0,
+                         max_z=max_airspeed,
+                         xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), cbar_label="[m/s]",
+                         save_plot=save_plots)
+
+
+    title_str = "L3 VAD wind biases averaged by wind tracing score"
+    plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_l3_vad'], cmap='jet',
+                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="airspeed_l3vad_height_insectprop.png", min_z=0,
+                         max_z=None, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), plot_txt=None,
+                         cbar_label="[m/s]", save_plot=save_plots)
+
+    title_str = "Histogram of l3 VAD biases"
+    plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['count_airspeed_l3_vad'],
+                         cmap='jet', xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="count_airspeed_l3vad_height_insectprop.png", min_z=0,
+                         max_z=None, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), plot_txt=None,
+                         cbar_label="[no unit]", save_plot=save_plots)
 
     # Plot of height vs insect prop vs airspeed_insects
     max_airspeed_ins = np.max(np.abs(height_ip_df['airspeed_insects']))
