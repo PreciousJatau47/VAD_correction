@@ -703,6 +703,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                                                                                         uniqueY=unique_insect_prop_bins)
 
     # Plot of height vs insect prop vs bird-insect airspeed difference
+    min_insect_prop_plot = 10
     thresholds = (-Constants.BI_BIAS_DIFF_THRESHOLD, Constants.BI_BIAS_DIFF_THRESHOLD)
 
     total_valid = np.sum(np.isfinite(height_ip_df['airspeed_diff']))
@@ -722,16 +723,16 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     info_str = ">  {} m/s,  {}%\n<= {} m/s, {}%\nelse {}%".format(thresholds[1], round(pos_diff, 2), thresholds[0],
                                                                   round(neg_diff, 2), round(zero_diff, 2))
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_diff'], cmap='jet',
-                         xlab='insect prop bio [%]', ylab='height [m]', title_str=title_str,
+                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="airspeed_difference.png", min_z=-max_amp,
-                         max_z=max_amp, xlim=(0, 100), ylim=(0, 1000), plot_txt=(55, 800, info_str), cbar_label="[m/s]",
+                         max_z=max_amp, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), plot_txt=(55, 800, info_str), cbar_label="[m/s]",
                          save_plot=save_plots)
 
     title_str = "".join(["Histogram of ", title_str])
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid["count_airspeed_diff"], cmap='jet',
-                         xlab='insect prop bio [%]', ylab='height [m]', title_str=title_str,
+                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="count_bi_airspeed_difference.png", min_z=-max_amp,
-                         max_z=None, xlim=(0, 100), ylim=(0, 1000), plot_txt=None, cbar_label="[no unit]",
+                         max_z=None, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), plot_txt=None, cbar_label="[no unit]",
                          save_plot=save_plots)
 
     # Plot of height vs insect prop vs bio-insect airspeed difference
@@ -741,14 +742,19 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     zero_diff = np.sum(gu.logical_and(diff_bio_ins <= thresholds[1], diff_bio_ins > thresholds[0])) / total_valid * 100
     neg_diff = np.sum(diff_bio_ins <= thresholds[0]) / total_valid * 100
 
+    max_diff = np.nanmax(height_ip_df['airspeed_diff_bio_ins'])
+    min_diff = np.nanmin(height_ip_df['airspeed_diff_bio_ins'])
+    max_amp_bio_ins = round(max(np.abs(max_diff), np.abs(min_diff)))
+    max_amp_bio_ins = max(max_amp_bio_ins, 3)
+
     title_str = r"$bias_{bio} - bias_{insects}$"
     info_str = ">  {} m/s,  {}%\n<= {} m/s, {}%\nelse {}%".format(thresholds[1], round(pos_diff, 2), thresholds[0],
                                                                   round(neg_diff, 2), round(zero_diff, 2))
 
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_diff_bio_ins'], cmap='jet',
-                         xlab='insect prop bio [%]', ylab='height [m]', title_str=title_str,
-                         out_dir=figure_summary_dir, out_name="airspeed_difference_bio_ins.png", min_z=-max_amp,
-                         max_z=max_amp, xlim=(0, 100), ylim=(0, 1000), plot_txt=(55, 800, info_str), cbar_label="[m/s]",
+                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="airspeed_difference_bio_ins.png", min_z=-max_amp_bio_ins,
+                         max_z=max_amp_bio_ins, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), plot_txt=(55, 800, info_str), cbar_label="[m/s]",
                          save_plot=save_plots)
 
     # Plot of height vs insect prop vs airspeed_bio
@@ -773,10 +779,11 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     max_airspeed_ins = np.max(np.abs(height_ip_df['airspeed_insects']))
     print("max_airspeed_ins: ", max_airspeed_ins)
 
+    title_str = r"VAD wind biases after IVWP"
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_insects'], cmap='jet',
-                         xlab='insect prop bio [%]', ylab='height [m]', title_str=r"$bias_{insects}$",
+                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="airspeed_ins_height_insectprop.png", min_z=0,
-                         max_z=max_airspeed, xlim=(0, 100), ylim=(0, 1000), cbar_label="[m/s]",
+                         max_z=max_airspeed, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), cbar_label="[m/s]",
                          save_plot=save_plots)
 
     # Plot: insect prop vs time of day vs height
