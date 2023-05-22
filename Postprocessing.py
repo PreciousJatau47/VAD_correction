@@ -872,9 +872,37 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                       "airspeed_biological", "airspeed_insects", "biological_wind_offset"]]
     height_time_df['airspeed_diff_bio_ins'] = height_time_df['airspeed_biological'] - height_time_df['airspeed_insects']
     height_time_df["biological_wind_offset"] = np.abs(height_time_df["biological_wind_offset"])
-    height_time_df["bird_prop_bio"] = 100 - height_time_df["insect_prop_bio"]
-    height_time_grouped = height_time_df.groupby(["height_bins", "time_hour_bins"], as_index=False).mean()
 
+    # Cases count by height-time.
+    variable_t_count = {"airspeed_biological": "count_airspeed_biological",
+                        "airspeed_insects": "count_airspeed_insects",
+                        'airspeed_diff_bio_ins': 'count_airspeed_diff_bio_ins'}
+    height_time_count = height_time_df.groupby(["height_bins", "time_hour_bins"], as_index=False).count()
+    height_time_count = height_time_count.loc[:,
+                        ["height_bins", "time_hour_bins", 'airspeed_biological', 'airspeed_insects',
+                         'airspeed_diff_bio_ins']]
+    height_time_count.rename(columns=variable_t_count, inplace=True)
+    height_time_count['cases_lost_bio_ins'] = height_time_count["count_airspeed_biological"] - height_time_count[
+        "count_airspeed_insects"]
+
+    # Average by height-time.
+    height_time_grouped = height_time_df.groupby(["height_bins", "time_hour_bins"], as_index=False).mean()
+    height_time_grouped = pd.merge(height_time_grouped, height_time_count, on=["height_bins", "time_hour_bins"],
+                                   how="inner")
+
+    # Filter out cases with insufficient samples.
+    for var in variable_t_count:
+        print(variable_t_count[var])
+        idx_sufficient_samples = height_time_grouped[variable_t_count[var]] > 10
+        height_time_grouped.loc[np.logical_not(idx_sufficient_samples), var] = np.nan
+
+    idx_sufficient_samples = height_time_grouped['count_airspeed_biological'] > 10
+    height_time_grouped.loc[np.logical_not(idx_sufficient_samples), 'cases_lost_bio_ins'] = np.nan
+
+    height_time_grouped['prop_cases_lost_bio_ins'] = height_time_grouped['cases_lost_bio_ins'] * 100 / \
+                                                     height_time_grouped['count_airspeed_biological']
+
+    # Prepare height-time grids for pcolor plots.
     max_num = max(np.max(height_time_grouped["num_insects_height"]), np.max(height_time_grouped["num_birds_height"]))
     height_time_grouped["num_insects_height"] /= max_num
     height_time_grouped["num_birds_height"] /= max_num
