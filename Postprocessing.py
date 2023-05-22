@@ -904,14 +904,20 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
     # Prepare height-time grids for pcolor plots.
     max_num = max(np.max(height_time_grouped["num_insects_height"]), np.max(height_time_grouped["num_birds_height"]))
-    height_time_grouped["num_insects_height"] /= max_num
-    height_time_grouped["num_birds_height"] /= max_num
+    max_num = np.ceil(max_num/500) * 500
+
+    max_num /= 1e3
+    height_time_grouped["num_insects_height"] /= 1e3
+    height_time_grouped["num_birds_height"] /= 1e3
 
     z_dict = {'insect_prop_bio': height_time_grouped['insect_prop_bio'],
               'num_birds_height': height_time_grouped['num_birds_height'],
               'num_insects_height': height_time_grouped['num_insects_height'],
               'airspeed_biological': height_time_grouped['airspeed_biological'],
-              'bird_prop_bio': height_time_grouped['bird_prop_bio']}
+              'airspeed_insects': height_time_grouped['airspeed_insects'],
+              'prop_cases_lost_bio_ins': height_time_grouped['prop_cases_lost_bio_ins'],
+              'airspeed_diff_bio_ins': height_time_grouped['airspeed_diff_bio_ins']}
+
     time_hr_bins, unique_height_bins, height_time_grid = prepare_pcolor_grid_from_series(
         height_time_grouped['time_hour_bins'],
         height_time_grouped['height_bins'],
@@ -927,20 +933,30 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                          max_z=100, xlim=(0, 24), ylim=(0, 1500), cbar_label="[%]", save_plot=save_plots)
 
     # Plot: Averaged bird population
-    title_str = "Averaged birds population"
+    title_str = "Averaged number of bird gates"
     plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins, z=np.transpose(height_time_grid['num_birds_height']),
                          cmap='RdYlBu',
                          xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="averaged_birds_population_height_timeday.png", min_z=0,
-                         max_z=1, xlim=(0, 24), ylim=(0, 1000), cbar_label="[no units]", save_plot=save_plots)
+                         max_z=max_num, xlim=(0, 24), ylim=(0, 1500), cbar_label=r"$\times 10^3$ [no units]", save_plot=save_plots)
 
     # Plot: Averaged bird population
-    title_str = "Averaged insects population."
+    title_str = "Averaged number of insect gates"
     plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins, z=np.transpose(height_time_grid['num_insects_height']),
                          cmap='RdYlBu',
                          xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="averaged_insects_population_height_timeday.png", min_z=0,
-                         max_z=1, xlim=(0, 24), ylim=(0, 1000), cbar_label="[no units]", save_plot=save_plots)
+                         max_z=max_num, xlim=(0, 24), ylim=(0, 1500), cbar_label=r"$\times 10^3$ [no units]", save_plot=save_plots)
+
+    # Plot: Fraction of cases lost bio-ins
+    title_str = "Fraction of cases lost after IVWP"
+    plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins,
+                         z=np.transpose(height_time_grid['prop_cases_lost_bio_ins']),
+                         cmap='jet',
+                         xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="prop_cases_lost_height_timeday.png",
+                         min_z=0, max_z=100, xlim=(0, 24), ylim=(0, 1500), cbar_label="[no units]",
+                         save_plot=save_plots)
 
     ####################################################################################################################
     # Plot: Averaged flight vel x time x height. Direction is the absolute offset from the wind.
@@ -979,8 +995,13 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
         max_num = max(np.max(population_grouped_df["num_insects_height"]),
                       np.max(population_grouped_df["num_birds_height"]))
-        population_grouped_df["num_insects_height"] /= max_num
-        population_grouped_df["num_birds_height"] /= max_num
+        max_num = np.ceil(max_num / 500) * 500
+
+        max_num /= 1e3
+        # height_time_grouped["num_insects_height"] /= 1e3
+        # height_time_grouped["num_birds_height"] /= 1e3
+        population_grouped_df["num_insects_height"] /= 1e3
+        population_grouped_df["num_birds_height"] /= 1e3
 
         month = 5
         noon_s_midnight = np.arange(0, 24 * 7, 24)
@@ -1001,26 +1022,26 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
             uniqueY=unique_height_bins)
 
         # Plot for number of birds gates
-        title_str = "Birds population"
+        title_str = "Averaged number of bird gates"
         plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
                              xtick_labs=xlabels,
                              key_col='num_birds_height', x=unique_time_week, y=unique_height_bins,
-                             min_z=0, max_z=1, xlab="Time [UTC]", ylab="Height [m]", cmap='RdYlBu',
+                             min_z=0, max_z=max_num, xlab="Time [UTC]", ylab="Height [m]", cmap='RdYlBu',
                              title_str=title_str, out_dir=figure_summary_dir,
                              out_name="bird_population_height_timeweek.png",
                              xlim=None,
-                             ylim=(0, 1000), cbar_label="[no units]", save_plot=save_plots)
+                             ylim=(0, 1000), cbar_label=r"$\times 10^3$ [no units]", save_plot=save_plots)
 
         # Plot for number of insect gates
-        title_str = "Insects population"
+        title_str = "Averaged number of insect gates"
         plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
                              xtick_labs=xlabels,
                              key_col='num_insects_height', x=unique_time_week, y=unique_height_bins,
-                             min_z=0, max_z=1, xlab="Time [UTC]", ylab="Height [m]", cmap='RdYlBu',
+                             min_z=0, max_z=max_num, xlab="Time [UTC]", ylab="Height [m]", cmap='RdYlBu',
                              title_str=title_str, out_dir=figure_summary_dir,
                              out_name="insect_population_height_timeweek.png",
                              xlim=None,
-                             ylim=(0, 1000), cbar_label="[no units]", save_plot=save_plots)
+                             ylim=(0, 1000), cbar_label=r"$\times 10^3$ [no units]", save_plot=save_plots)
 
         # Plot for insect_prop_bio
         title_str = "% insects relative to biological echoes"
