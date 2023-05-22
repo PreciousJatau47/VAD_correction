@@ -924,14 +924,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                          cmap='jet',
                          xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="averaged_insect_prop_height_timeday.png", min_z=0,
-                         max_z=100, xlim=(0, 24), ylim=(0, 1000), cbar_label="[%]", save_plot=save_plots)
-
-    title_str = "Averaged proportion of predicted birds"
-    plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins, z=np.transpose(height_time_grid['bird_prop_bio']),
-                         cmap='RdYlBu',
-                         xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
-                         out_dir=figure_summary_dir, out_name="averaged_bird_prop_height_timeday.png", min_z=0,
-                         max_z=100, xlim=(0, 24), ylim=(0, 1000), cbar_label="[%]", save_plot=save_plots)
+                         max_z=100, xlim=(0, 24), ylim=(0, 1500), cbar_label="[%]", save_plot=save_plots)
 
     # Plot: Averaged bird population
     title_str = "Averaged birds population"
