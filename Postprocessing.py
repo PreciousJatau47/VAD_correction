@@ -695,7 +695,8 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
               'airspeed_l3_vad': height_ip_df['airspeed_l3_vad'],
               'count_airspeed_l3_vad': height_ip_df['count_airspeed_l3_vad'],
               'airspeed_insects': height_ip_df['airspeed_insects'],
-              'airspeed_diff_bio_ins': height_ip_df['airspeed_diff_bio_ins']}  # monthly averages
+              'airspeed_diff_bio_ins': height_ip_df['airspeed_diff_bio_ins'],
+              'prop_cases_lost_bio_ins': height_ip_df['prop_cases_lost_bio_ins']}  # monthly averages
 
     unique_height_bins, ins_prop_bins, height_ip_grid = prepare_pcolor_grid_from_series(height_ip_df['height_bins'],
                                                                                         height_ip_df[
@@ -800,6 +801,14 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                          xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="airspeed_ins_height_insectprop.png", min_z=0,
                          max_z=max_airspeed, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), cbar_label="[m/s]",
+                         save_plot=save_plots)
+
+    title_str = r"Fraction of cases lost after IVWP"
+    plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['prop_cases_lost_bio_ins'],
+                         cmap='jet',
+                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="prop_cases_lost_height_insectprop.png", min_z=None,
+                         max_z=100, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), cbar_label="[no unit]",
                          save_plot=save_plots)
 
     # Plot: insect prop vs time of day vs height
