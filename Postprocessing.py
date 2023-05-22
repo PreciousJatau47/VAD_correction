@@ -815,7 +815,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     echo_profile_df = wind_error.loc[:,
                       ["month", "day", "time_hour", "insect_prop_bio", "height_m", "prop_weather_scan",
                        "num_insects_height", "num_birds_height", "biological_speed", "biological_direction",
-                       "airspeed_biological", "biological_wind_offset"]]
+                       "airspeed_biological", "airspeed_insects", "biological_wind_offset"]]
     echo_profile_df["height_bins"] = echo_profile_df['height_m'] // delta_height * delta_height + delta_height / 2
     echo_profile_df["time_hour_bins"] = echo_profile_df[
                                             'time_hour'] // delta_time_hour * delta_time_hour + delta_time_hour / 2
@@ -869,7 +869,8 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     # Height vs time of day vs data analysis.
     height_time_df = echo_profile_df.loc[:,
                      ["height_bins", "time_hour_bins", "insect_prop_bio", "num_insects_height", "num_birds_height",
-                      "airspeed_biological", "biological_wind_offset"]]
+                      "airspeed_biological", "airspeed_insects", "biological_wind_offset"]]
+    height_time_df['airspeed_diff_bio_ins'] = height_time_df['airspeed_biological'] - height_time_df['airspeed_insects']
     height_time_df["biological_wind_offset"] = np.abs(height_time_df["biological_wind_offset"])
     height_time_df["bird_prop_bio"] = 100 - height_time_df["insect_prop_bio"]
     height_time_grouped = height_time_df.groupby(["height_bins", "time_hour_bins"], as_index=False).mean()
