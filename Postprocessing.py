@@ -1009,10 +1009,11 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         max_num = np.ceil(max_num / 500) * 500
 
         max_num /= 1e3
-        # height_time_grouped["num_insects_height"] /= 1e3
-        # height_time_grouped["num_birds_height"] /= 1e3
         population_grouped_df["num_insects_height"] /= 1e3
         population_grouped_df["num_birds_height"] /= 1e3
+
+        max_airspeed_bio = np.max(np.abs(population_grouped_df['airspeed_biological']))
+        max_airspeed = max(8, max_airspeed_bio)
 
         month = 5
         noon_s_midnight = np.arange(0, 24 * 7, 24)
@@ -1066,26 +1067,26 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                              ylim=(0, 1000), cbar_label="[%]", save_plot=save_plots)
 
         # Plot for airspeed_bio height profile for whole month.
-        title_str = "Biases from biological echoes"
+        title_str = "VAD wind biases"
         plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
                              xtick_labs=xlabels,
                              key_col='airspeed_biological', x=unique_time_week, y=unique_height_bins,
-                             min_z=0, max_z=8, xlab="Time [UTC]", ylab="Height [m]", cmap='jet',
+                             min_z=0, max_z=max_airspeed, xlab="Time [UTC]", ylab="Height [m]", cmap='jet',
                              title_str=title_str, out_dir=figure_summary_dir,
                              out_name="airspeed_biological_height_timeweek.png",
                              xlim=None,
-                             ylim=(0, 1000), cbar_label="[m/s]", save_plot=save_plots)
+                             ylim=(0, 1500), cbar_label="[m/s]", save_plot=save_plots)
 
         # Plot for airspeed_ins height profile for whole month.
-        title_str = "Biases from insect echoes"
+        title_str = "VAD wind biases after removing bird echoes"
         plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
                              xtick_labs=xlabels,
                              key_col='airspeed_insects', x=unique_time_week, y=unique_height_bins,
-                             min_z=0, max_z=8, xlab="Time [UTC]", ylab="Height [m]", cmap='jet',
+                             min_z=0, max_z=max_airspeed, xlab="Time [UTC]", ylab="Height [m]", cmap='jet',
                              title_str=title_str, out_dir=figure_summary_dir,
                              out_name="airspeed_insects_height_timeweek.png",
                              xlim=None,
-                             ylim=(0, 1000), cbar_label="[m/s]", save_plot=save_plots)
+                             ylim=(0, 1500), cbar_label="[m/s]", save_plot=save_plots)
 
         ################################################################################################################
         # Plot for wind vec height profile for whole month.
