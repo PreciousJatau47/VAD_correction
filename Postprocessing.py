@@ -177,9 +177,8 @@ def plot_weekly_averages(weekly_data, day_starts, noon_s_midnight, xtick_labs, k
         if z is None:
             continue
 
-        if min_z is not None:
-            v_min = min(np.nanmin(z), min_z)
-            v_max = max(np.nanmax(z), max_z)
+        v_min = min(np.nanmin(z), min_z) if min_z is not None else min_z
+        v_max = max(np.nanmax(z), max_z) if max_z is not None else max_z
         im = ax[week].pcolor(x, y, np.transpose(z), cmap=cmap, vmin=v_min, vmax=v_max)
         ax[week].set_xticks(noon_s_midnight)
         ax[week].set_xticklabels(xtick_labs[week])
