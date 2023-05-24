@@ -925,7 +925,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         uniqueY=unique_height_bins)
 
     # Plot: Averaged insect profile
-    title_str = "Averaged % insects relative to biological echoes"
+    title_str = "Averaged VAD wind tracing scores"
     plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins, z=np.transpose(height_time_grid['insect_prop_bio']),
                          cmap='jet',
                          xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
@@ -963,16 +963,28 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     height_time_grouped["abs_bio_off_U"], height_time_grouped["abs_bio_off_V"] = \
         Polar2CartesianComponentsDf(spd=0.5, dirn=height_time_grouped["biological_wind_offset"])
 
-    title_str = "Biases from VAD on biological echoes"
-    plot_averages_pcolor_with_vector_field(x=time_hr_bins, y=unique_height_bins,
-                                           z=np.transpose(height_time_grid['airspeed_biological']), cmap='jet',
-                                           xlab='Time [UTC]',
-                                           ylab='Height [m]', title_str=title_str, out_dir=figure_summary_dir,
-                                           out_name="averaged_flightvel_height_timeday.png", min_z=None, max_z=None,
-                                           vec_df=height_time_grouped, x_col="time_hour_bins", y_col="height_bins",
-                                           u_col="abs_bio_off_U", v_col="abs_bio_off_V", xlim=(0, 24), ylim=(0, 1000),
-                                           plot_txt=None, cbar_label="[m/s]",
-                                           save_plot=save_plots)
+    title_str = "Averaged VAD wind biases"
+    plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins, z=np.transpose(height_time_grid['airspeed_biological']),
+                         cmap='jet', xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="averaged_bio_bias_height_timeday.png", min_z=None,
+                         max_z=max_airspeed, xlim=(0, 24), ylim=(0, 1500), plot_txt=None, cbar_label="[m/s]",
+                         save_plot=save_plots)
+
+    title_str = "Averaged VAD wind biases after removing bird echoes"
+    plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins, z=np.transpose(height_time_grid['airspeed_insects']),
+                         cmap='jet', xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="averaged_insect_bias_height_timeday.png", min_z=None,
+                         max_z=max_airspeed, xlim=(0, 24), ylim=(0, 1500), plot_txt=None, cbar_label="[m/s]",
+                         save_plot=save_plots)
+
+    title_str = r"$bias_{bio} - bias_{insects}$"
+    plot_averages_pcolor(x=time_hr_bins, y=unique_height_bins,
+                         z=np.transpose(height_time_grid['airspeed_diff_bio_ins']),
+                         cmap='jet', xlab='Time [UTC]', ylab='Height [m]', title_str=title_str,
+                         out_dir=figure_summary_dir, out_name="airspeed_difference_bio_ins_height_timeday.png",
+                         min_z=-max_amp_bio_ins,
+                         max_z=max_amp_bio_ins, xlim=(0, 24), ylim=(0, 1500), plot_txt=None, cbar_label="[m/s]",
+                         save_plot=save_plots)
     ####################################################################################################################
 
     # Plot: weekly profiles for whole month
