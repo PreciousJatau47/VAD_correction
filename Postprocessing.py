@@ -371,6 +371,18 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
         max_airspeed = max(tmp, np.nanmax(wind_error['airspeed_birds']))
         max_airspeed = max_airspeed * 1.05
 
+    # Scatterplot. VAD insect proportions vs probabilities.
+    wts = (1 - wind_error['mean_prob_biological']) * 100
+    plt.figure(figsize=(6.4 * 1.2, 4.8 * 1.2))
+    plt.scatter(x=wts, y=wind_error["insect_prop_bio_height"], alpha=0.2)
+    plt.xlabel("Insect probability (%)")
+    plt.ylabel("Insect proportion (%)")
+    plt.title(r"Comparison between insect proportions and probabilities of VADs")
+    plt.grid(True)
+    plt.tight_layout()
+    if save_plots:
+        plt.savefig(os.path.join(figure_summary_dir, "insect_prop_v_prob.png"), dpi=200)
+
     # Plot 2. Bird x insect flightspeed.
     plt.figure(figsize=(6.4 * 1.2, 4.8 * 1.2))
     plt.plot([0, max_airspeed], [0, max_airspeed], linestyle='dashed', alpha=0.6)
