@@ -732,6 +732,23 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     height_ip_df['prop_cases_lost_bio_ins'] = height_ip_df['cases_lost_bio_ins'] * 100 / height_ip_df[
             'count_airspeed_biological']
 
+    # Fraction of cases lost after IVWP
+    cases_hist_df = height_ip_df.loc[:, ['insect_prop_bins', 'cases_lost_bio_ins', 'count_airspeed_biological']]
+    cases_lost_df = cases_hist_df.groupby(["insect_prop_bins"], as_index=False).sum()
+    cases_lost_df['prop_cases_lost_bio_ins'] = cases_lost_df['cases_lost_bio_ins'] * 100 / cases_lost_df[
+        'count_airspeed_biological']
+
+    plt.figure()
+    plt.grid()
+    plt.plot(cases_lost_df['insect_prop_bins'], cases_lost_df['prop_cases_lost_bio_ins'], linewidth=3)
+    plt.xlim(0, 100)
+    plt.ylim(0, 100)
+    plt.xlabel('Wind tracing index (%)')
+    plt.ylabel('Fraction of cases lost (%)')
+    plt.title("Fraction of cases lost after IVWP")
+    if save_plots:
+        plt.savefig(os.path.join(figure_summary_dir, "prop_cases_lost_insect_prop.png"), dpi=200)
+
     # Prepare height-insect prop. grids for pcolor plots
     unique_insect_prop_bins = np.arange(delta_insect_prop / 2, 100, delta_insect_prop)
     unique_height_bins = np.arange(delta_height / 2, 1000, delta_height)
