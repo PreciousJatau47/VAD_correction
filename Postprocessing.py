@@ -684,15 +684,19 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     if save_plots:
         plt.savefig(os.path.join(figure_summary_dir, "scatter_airspeed_diff_bio_ins_vs_wts.png"), dpi=200)
 
+    # Scatterplot. Biases biological echoes vs wind tracing score.
     plt.figure(figsize=(6.4 * 1.2, 4.8 * 1.2))
     plt.grid(True)
-    plt.scatter(bias_df['bird_prop_bio'], bias_df['airspeed_biological'], s=4, alpha=0.2)
-    plt.xlabel("Proportion of predicted birds [%]")
+    plt.scatter(bias_df['insect_prop_bio'], bias_df['airspeed_biological'], s=4, alpha=0.2)
+    plt.plot(avg_bias_df['insect_prop_bins'], avg_bias_df['airspeed_biological'], c='red', linewidth=3,
+             label=r'average $\mu$')
+    plt.xlabel("Wind tracing index [%]")
     plt.ylabel("Biases from bio VAD [m/s]")
-    plt.title("Biases from bio VAD. Height > {} m".format(lb_height))
+    plt.title("Biases from VAD on biological echoes. Height {} - {} m".format(lb_height, ub_height))
+    plt.legend()
     plt.tight_layout()
     if save_plots:
-        plt.savefig(os.path.join(figure_summary_dir, "bias_bio_scatter.png"), dpi=200)
+        plt.savefig(os.path.join(figure_summary_dir, "scatter_bias_bio_v_wts.png"), dpi=200)
     ####################################################################################################################
 
     # Total cases with both bird and insect VADs.
