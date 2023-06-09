@@ -647,13 +647,42 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     height_ip_df["insect_prop_bins"] = height_ip_df[
                                            "insect_prop_bio"] // delta_insect_prop * delta_insect_prop + delta_insect_prop / 2
 
-    # Bias bio vs % birds scatterplot.
-    lb_height = 350
-    height_ip_df["bird_prop_bins"] = 100 - height_ip_df["insect_prop_bins"]
-    height_ip_df["bird_prop_bio"] = 100 - height_ip_df["insect_prop_bio"]
 
-    # bias_df = height_ip_df.loc[height_ip_df["height_m"] > lb_height, :]
-    bias_df = height_ip_df.copy()
+    # Scatterplot. Improvement, wind bias vs wind tracing score
+    lb_height, ub_height = 300, 1300 #200, 1300
+    idx_bias_scatter = ImposeConstraints(height_ip_df, [("height_m", lb_height, ub_height)])
+    bias_df = height_ip_df.loc[idx_bias_scatter, :]
+
+    # Calculate mean and standard deviation.
+    avg_bias_df = bias_df.loc[:, ['insect_prop_bins', 'airspeed_diff_bio_ins', 'airspeed_biological']]
+    std_bias_df = avg_bias_df.copy()
+    avg_bias_df = avg_bias_df.groupby(["insect_prop_bins"], as_index=False).mean()
+    std_bias_df = std_bias_df.groupby(['insect_prop_bins'], as_index=False).apply(np.std)
+
+    # Upper and lower bounds
+    lb_diff = avg_bias_df['airspeed_diff_bio_ins'] - 3 * std_bias_df['airspeed_diff_bio_ins']
+    ub_diff = avg_bias_df['airspeed_diff_bio_ins'] + 3 * std_bias_df['airspeed_diff_bio_ins']
+    improv_lim = max(abs(np.nanmin(lb_diff)), abs(np.nanmax(ub_diff)))
+
+    plt.figure(figsize=(6.4 * 1.2, 4.8 * 1.2))
+    plt.grid(True)
+    plt.axhline(y=0, color='yellow', linestyle='--', alpha=0.8)
+    plt.scatter(bias_df['insect_prop_bio'], bias_df['airspeed_diff_bio_ins'], s=4, alpha=0.2)
+    plt.plot(avg_bias_df['insect_prop_bins'], lb_diff, linestyle='dashed', c='orange', alpha=0.8, linewidth=2,
+             label=r"$\mu$-3$\sigma$")
+    plt.plot(avg_bias_df['insect_prop_bins'], avg_bias_df['airspeed_diff_bio_ins'], c='red', linewidth=3,
+             label=r'average $\mu$')
+    plt.plot(avg_bias_df['insect_prop_bins'], ub_diff, linestyle='dashed', c='orange', alpha=0.8, linewidth=2,
+             label=r"$\mu$+3$\sigma$")
+    plt.xlim(0, 100)
+    plt.ylim(-improv_lim, improv_lim)
+    plt.xlabel("Wind tracing index [%]")
+    plt.ylabel(r"$bias_{bio} - bias_{insects}$")
+    plt.title(r"$bias_{bio} - bias_{insects}. $" + "Height {} - {} m".format(lb_height, ub_height))
+    plt.legend()
+    plt.tight_layout()
+    if save_plots:
+        plt.savefig(os.path.join(figure_summary_dir, "scatter_airspeed_diff_bio_ins_vs_wts.png"), dpi=200)
 
     plt.figure(figsize=(6.4 * 1.2, 4.8 * 1.2))
     plt.grid(True)
