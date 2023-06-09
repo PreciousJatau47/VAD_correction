@@ -1152,6 +1152,17 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                              xlim=None,
                              ylim=(0, 1500), cbar_label="[m/s]", save_plot=save_plots)
 
+        # Plot. Improvement for whole month.
+        title_str = r"$bias_{bio} - bias_{insects}$"
+        plot_weekly_averages(weekly_data=weekly_data, day_starts=day_starts, noon_s_midnight=noon_s_midnight,
+                             xtick_labs=xlabels,
+                             key_col='airspeed_diff_bio_ins', x=unique_time_week, y=unique_height_bins,
+                             min_z=-max_amp_bio_ins, max_z=max_amp_bio_ins, xlab="Time [UTC]", ylab="Height [m]",
+                             cmap='jet', title_str=title_str, out_dir=figure_summary_dir,
+                             out_name="airspeed_difference_bio_ins_height_timeweek.png",
+                             xlim=None,
+                             ylim=(0, 1500), cbar_label="[m/s]", save_plot=save_plots)
+
         ################################################################################################################
         # Plot for wind vec height profile for whole month.
         population_grouped_df["wind_U"], population_grouped_df["wind_V"] = Polar2CartesianComponentsDf(spd=0.5, dirn=
