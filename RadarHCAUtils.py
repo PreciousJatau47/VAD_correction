@@ -277,7 +277,12 @@ def MergeRadarAndHCAUpdate(radar, hca_volume, maxRange):
     slice_store = dict(zip(hca_volume.keys(), [None for i in range(len(hca_volume))]))
 
     for radar_sweep_idx in range(n_sweeps):
-        radar_el_default = np.mean(radar.elevation['data'][radar.get_slice(radar_sweep_idx)])
+        elevs_slice = radar.elevation['data'][radar.get_slice(radar_sweep_idx)]
+        if elevs_slice.size == 0:
+            print("Empty elevation slice. Skipping to next iteration")
+            continue
+
+        radar_el_default = np.mean(elevs_slice)
         radar_el = round(radar_el_default / 0.5) * 0.5
 
         # build radar + hca table if radar elevation matches hca elevation
