@@ -1,3 +1,4 @@
+import pyart.io
 import pygrib
 import numpy as np
 import pandas as pd
@@ -137,11 +138,10 @@ def Main():
     log_dir = './atmospheric_model_data/UV_wind_logs'
     log_file_base = '{}_windcomponents_lat_{}_lon_{}.pkl'
 
-    # radar_location_kohx = {'latitude': 36.247222900390625, 'longitude': -86.5625, 'height': 205.0}
-    radar_location_khpx = {'latitude': 36.73697280883789, 'longitude': -87.28558349609375, 'height': 186.0}
-    radar_location_kohx = {'latitude': 34.93055725097656, 'longitude': -86.08361053466797, 'height': 566.0}
-    radar_location_klvx = {'latitude':37.975276947021484, 'longitude': -85.94388580322266, 'height': 253.0}
-    radar_location = radar_location_klvx
+    radar_file_path = 'radar_data/KHGX_20220501_20220531/0001/KHGX20220507_130232_V06.ar2v'
+    radar = pyart.io.read(radar_file_path)
+    radar_location = {'latitude': radar.latitude['data'][0], 'longitude': radar.longitude['data'][0],
+                      "height": radar.altitude['data'][0]}
 
     # BNA sounding station
     station_lat = 36.25
