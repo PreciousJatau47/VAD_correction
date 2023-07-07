@@ -10,6 +10,7 @@ from VADUtils import VADWindProfile
 from L3VADReader import GetL3VADWindProfile
 import GeneralUtils as gu
 from collections import Counter
+import calendar
 
 font = {'family': 'DejaVu Sans',
         'weight': 'bold',
@@ -305,7 +306,7 @@ def PrepareAnalyzeWindInputs(radar_data_file, batch_folder, radar_data_folder, h
                                                           max_range=400,
                                                           clf_file=clf_file, norm_stats_file=norm_stats_file,
                                                           correct_hca_weather=correct_hca_weather,
-                                                          max_height_VAD=1000, biw_norm_stats_file=biw_norm_stats_file,
+                                                          max_height_correction=1000, biw_norm_stats_file=biw_norm_stats_file,
                                                           biw_clf_file=biw_clf_file, allowed_el_hca=allowed_el_hca)
 
         target_folder = os.path.split(radar_subpath)
@@ -371,9 +372,13 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, l3_vad_fold
     elif ground_truth_source == WindSource.rap_130:
         print("Ground truth wind is rap 130.")
         rap_file = RAP_FILE_BASE.format(year, month, day, hh)
+        _, month_end = calendar.monthrange(year=int(year), month=int(month))
+        rap_folder_case = os.path.join(rap_folder,
+                                       "rap_130_{}{}{}_{}{}{}".format(year, month, '01', year, month, str(month_end)))
+        # print(rap_folder_case)
         gt_wind_df, gt_wind_location = GetRapWindProfileRelativeToRadar(location_radar['latitude'],
                                                                         location_radar['longitude'], location_radar,
-                                                                        rap_folder, rap_file, log_dir_rap,
+                                                                        rap_folder_case, rap_file, log_dir_rap,
                                                                         log_file_base_rap, show_fig=False,
                                                                         force_update=False,
                                                                         save_wind_profile=True)

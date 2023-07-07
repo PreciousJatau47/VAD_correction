@@ -716,7 +716,7 @@ def Main():
     radar_t_sounding = RadarXSoundingDistance(nexrad_table=None, sounding_table=None, output_folder="./radar_data")
     sounding_log_dir = "./sounding_logs"
 
-    rap_folder = r"./atmospheric_model_data/rap_130_20180501_20180531"
+    rap_folder = r"./atmospheric_model_data"
 
     # VAD
     vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather, VADMask.biological]
