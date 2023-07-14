@@ -3,6 +3,7 @@ import random
 import math
 import sys
 import pickle
+import GeneralUtils as gu
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import least_squares, minimize
@@ -18,9 +19,36 @@ signal_func = lambda x, t: x[0] * np.sin(2 * np.pi * (1 / 360) * t + x[1])
 MAX_FLOAT = sys.float_info.max
 MIN_FLOAT = sys.float_info.min
 
+class Missingness(enum.Enum):
+    random = 0
+    sector = 1
+
 def GenerateVAD(speed, dirn, dirn_grid):
     phase = (90 - dirn) * np.pi / 180
     return signal_func([speed, phase], dirn_grid)
+
+def AddVADMissingness(y_data, x_grid, miss_type, miss_prop=0.0, start_az=0):
+    y_data = y_data.copy()
+    if miss_prop == 0:
+        return y_data
+
+    if miss_type == Missingness.random:
+        len_data = len(y_data)
+        option_idxs = [i for i in range(len_data)]
+        num_miss = int(miss_prop * len_data)
+        miss_idxs = list(np.random.choice(a=option_idxs, size=num_miss, replace=False))
+    elif miss_type == Missingness.sector:
+        sector_width = miss_prop * 360
+        stop_az = start_az + sector_width
+        miss_sectors = [(start_az, 360), (0, stop_az % 360)] if stop_az > 360 else [(start_az, stop_az)]
+
+        miss_idxs = False
+        for start, stop in miss_sectors:
+            idx = np.logical_and(x_grid >= start, x_grid < stop)
+            miss_idxs = np.logical_or(miss_idxs, idx)
+
+    y_data[miss_idxs] = -64.5
+    return y_data
 
 
 def GenerateNoiseNormal(mu=0, sdev=1, num_samples=100):

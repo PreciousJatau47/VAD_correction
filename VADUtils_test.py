@@ -49,6 +49,53 @@ class TestVADUtils(unittest.TestCase):
         print("pred. insects: ", np.sum(pred_ins_mask))
         assert np.logical_and.reduce(exp_ins_mask == pred_ins_mask)
 
+    def test_AddVADMissingness(self):
+        # Generate data.
+        N = 360
+        t = np.linspace(0, 360, N)
+        data = np.ones(N)
+
+        # random missingness
+        miss_prop = 0.0
+        miss_type = Missingness.random
+        start_az = 300
+        data_miss = AddVADMissingness(y_data=data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop, start_az=start_az)
+        meas_miss_prop = np.nanmean(np.logical_or(data_miss == -64.5, np.logical_not(np.isfinite(data))))
+        self.assertAlmostEqual(first=miss_prop, second=meas_miss_prop, delta=0.1)
+
+        miss_prop = 0.5
+        data_miss = AddVADMissingness(y_data=data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop, start_az=start_az)
+        meas_miss_prop = np.nanmean(np.logical_or(data_miss == -64.5, np.logical_not(np.isfinite(data))))
+        self.assertAlmostEqual(first=miss_prop, second=meas_miss_prop, delta=0.1)
+
+        # sector missingness.
+        miss_prop = 0.1
+        miss_type = Missingness.sector
+        start_az = 300
+        data_miss = AddVADMissingness(y_data=data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop,
+                                      start_az=start_az)
+        sector_width = miss_prop * 360
+        expected_miss_sect = np.logical_and(t >= start_az, t < start_az + sector_width)
+        meas_miss_sect = np.logical_or(data_miss == -64.5, np.logical_not(np.isfinite(data)))
+        self.assertTrue(np.logical_and.reduce(expected_miss_sect == meas_miss_sect))
+
+        # missing sector wraps around at 360
+        miss_prop = 1/6
+        miss_type = Missingness.sector
+        start_az = 330
+        data_miss = AddVADMissingness(y_data=data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop,
+                                      start_az=start_az)
+        sector_width = miss_prop * 360
+
+        # expected missing sector is from 330 to 30 (wraps around at 360)
+        stop_az = (start_az + sector_width) % 360
+        expected_miss_sect = np.logical_and(t >= start_az, t < 360)
+        expected_miss_sect = np.logical_or(expected_miss_sect, np.logical_and(t >= 0, t < stop_az))
+        meas_miss_sect = np.logical_or(data_miss == -64.5, np.logical_not(np.isfinite(data)))
+        self.assertTrue(np.logical_and.reduce(expected_miss_sect == meas_miss_sect))
+
+
+
     def test_MixVADs(self):
         N = 720 * 2
         t = np.linspace(0, 360, N)
