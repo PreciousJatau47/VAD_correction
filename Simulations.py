@@ -124,7 +124,7 @@ def SimulateBIPredictions(tpr=0.95, tnr=0.95, idx_birds=[], idx_insects=[]):
     return is_birds_pred
 
 
-def CalculateBirdAndInsectAirspeedsFromVAD(az_grid, vad_measured, is_birds, wind_spd, wind_dirn):
+def CalculateBirdAndInsectAirspeedsFromVAD(az_grid, vad_measured, is_birds, wind_spd, wind_dirn, min_req_samples=720):
     # Extract VADs.
     vad_birds = vad_measured[is_birds]
     az_birds = az_grid[is_birds]
@@ -137,20 +137,31 @@ def CalculateBirdAndInsectAirspeedsFromVAD(az_grid, vad_measured, is_birds, wind
     # plt.legend()
     # plt.show()
 
-    # Calculate airspeeds.
-    pred_speed_birds, pred_dirn_birds, _ = fitVAD(pred_var=az_birds, resp_var=vad_birds, signal_func=signal_func,
-                                                  showDebugPlot=False, description='')
-    # print("Predicted. speed: {} mps. direction: {} degrees.".format(pred_speed_birds, pred_dirn_birds))
+    # Birds airspeed
+    pred_speed_birds, pred_dirn_birds, _, _ = fitVAD(pred_var=az_birds, resp_var=vad_birds, signal_func=signal_func,
+                                                     showDebugPlot=False, description='',
+                                                     min_required_nsamples=min_req_samples)
+    print("Predicted. speed: {} mps. direction: {} degrees.".format(pred_speed_birds, pred_dirn_birds))
     airspeed_birds = CalcPolarDiffVec(spd1=pred_speed_birds, dirn1=pred_dirn_birds,
                                       spd2=wind_spd, dirn2=wind_dirn)[0]
 
-    pred_speed_insects, pred_dirn_insects, _ = fitVAD(pred_var=az_insects, resp_var=vad_insects,
-                                                      signal_func=signal_func,
-                                                      showDebugPlot=False, description='')
-    # print("Predicted. speed: {} mps. direction: {} degrees.".format(pred_speed_insects, pred_dirn_insects))
+    # Insects
+    pred_speed_insects, pred_dirn_insects, _, _ = fitVAD(pred_var=az_insects, resp_var=vad_insects,
+                                                         signal_func=signal_func,
+                                                         showDebugPlot=False, description='',
+                                                         min_required_nsamples=min_req_samples)
+    print("Predicted. speed: {} mps. direction: {} degrees.".format(pred_speed_insects, pred_dirn_insects))
     airspeed_insects = CalcPolarDiffVec(spd1=pred_speed_insects, dirn1=pred_dirn_insects,
                                         spd2=wind_spd, dirn2=wind_dirn)[0]
-    return airspeed_birds, airspeed_insects
+
+    # All biological echoes
+    pred_speed_bio, pred_dirn_bio, _, _ = fitVAD(pred_var=az_grid, resp_var=vad_measured,
+                                                 signal_func=signal_func,
+                                                 showDebugPlot=False, description='',
+                                                 min_required_nsamples=min_req_samples)
+    print("Predicted. speed: {} mps. direction: {} degrees.".format(pred_speed_bio, pred_dirn_bio))
+    airspeed_bio = CalcPolarDiffVec(spd1=pred_speed_bio, dirn1=pred_dirn_bio, spd2=wind_spd, dirn2=wind_dirn)[0]
+    return airspeed_birds, airspeed_insects, airspeed_bio
 
 
 # TODO(pjatau)
@@ -167,6 +178,9 @@ def Main():
     # Model parameters.
     tpr, tnr = .9, .9  # TPR, TNR
 
+    # VAD parameters.
+    min_req_samples = 720
+
     winds, az_grid = GenerateWinds(wind_spd=wind_spd, wind_dirn=wind_dirn, wind_offset_insects=wind_offset_insects,
                                    num_samples=num_samples, noise_mean=0, noise_sdev=1, show_debug_plot=False)
 
@@ -176,6 +190,7 @@ def Main():
     airspeeds_ins_true = []
     airspeeds_birds_bi = []
     airspeeds_ins_bi = []
+    airspeeds_bio_bi = []
 
     mixing_ratios_pred = []
 
@@ -187,9 +202,10 @@ def Main():
                                                                           show_plot=False)
 
         # Calculate airspeeds for ground truth.
-        airspd_birds, airspd_ins = CalculateBirdAndInsectAirspeedsFromVAD(az_grid=az_grid, vad_measured=vad_measured,
-                                                                          is_birds=is_birds_true, wind_spd=wind_spd,
-                                                                          wind_dirn=wind_dirn)
+        airspd_birds, airspd_ins, _ = CalculateBirdAndInsectAirspeedsFromVAD(az_grid=az_grid, vad_measured=vad_measured,
+                                                                             is_birds=is_birds_true, wind_spd=wind_spd,
+                                                                             wind_dirn=wind_dirn,
+                                                                             min_req_samples=min_req_samples)
         airspeeds_birds_true.append(airspd_birds)
         airspeeds_ins_true.append(airspd_ins)
 
@@ -197,13 +213,15 @@ def Main():
         is_birds_pred = SimulateBIPredictions(tpr=tpr, tnr=tnr, idx_birds=idx_birds, idx_insects=idx_insects)
 
         # Calculate airspeeds for model predictions.
-        airspd_birds_bi, airspd_ins_bi = CalculateBirdAndInsectAirspeedsFromVAD(az_grid=az_grid,
-                                                                                vad_measured=vad_measured,
-                                                                                is_birds=is_birds_pred,
-                                                                                wind_spd=wind_spd,
-                                                                                wind_dirn=wind_dirn)
+        airspd_birds_bi, airspd_ins_bi, airspeed_bio_bi = CalculateBirdAndInsectAirspeedsFromVAD(az_grid=az_grid,
+                                                                                                 vad_measured=vad_measured,
+                                                                                                 is_birds=is_birds_pred,
+                                                                                                 wind_spd=wind_spd,
+                                                                                                 wind_dirn=wind_dirn,
+                                                                                                 min_req_samples=min_req_samples)
         airspeeds_birds_bi.append(airspd_birds_bi)
         airspeeds_ins_bi.append(airspd_ins_bi)
+        airspeeds_bio_bi.append(airspeed_bio_bi)
 
         mixing_ratios_pred.append(np.sum(is_birds_pred == False) / len(is_birds_pred))
 
@@ -213,6 +231,7 @@ def Main():
     ax.plot(mixing_ratios, airspeeds_birds_true, c='blue', label='true birds', alpha=0.3)
     ax.plot(mixing_ratios, airspeeds_ins_bi, c='red', label='pred. insects')
     ax.plot(mixing_ratios, airspeeds_birds_bi, c='blue', label='pred. birds')
+    ax.plot(mixing_ratios, airspeeds_bio_bi, c='green', label='pred. bio')
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 8.5)
     ax.grid(True)
