@@ -59,12 +59,14 @@ class TestVADUtils(unittest.TestCase):
         miss_prop = 0.0
         miss_type = Missingness.random
         start_az = 300
-        data_miss = AddVADMissingness(y_data=data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop, start_az=start_az)
+        data_miss = AddVADMissingness(y_data=data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop,
+                                      start_az=start_az)
         meas_miss_prop = np.nanmean(np.logical_or(data_miss == -64.5, np.logical_not(np.isfinite(data_miss))))
         self.assertAlmostEqual(first=miss_prop, second=meas_miss_prop, delta=0.1)
 
         miss_prop = 0.5
-        data_miss = AddVADMissingness(y_data=data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop, start_az=start_az)
+        data_miss = AddVADMissingness(y_data=data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop,
+                                      start_az=start_az)
         meas_miss_prop = np.nanmean(np.logical_or(data_miss == -64.5, np.logical_not(np.isfinite(data_miss))))
         self.assertAlmostEqual(first=miss_prop, second=meas_miss_prop, delta=0.1)
 
@@ -93,8 +95,6 @@ class TestVADUtils(unittest.TestCase):
         expected_miss_sect = np.logical_or(expected_miss_sect, np.logical_and(t >= 0, t < stop_az))
         meas_miss_sect = np.logical_or(data_miss == -64.5, np.logical_not(np.isfinite(data_miss)))
         self.assertTrue(np.logical_and.reduce(expected_miss_sect == meas_miss_sect))
-
-
 
     def test_MixVADs(self):
         N = 720 * 2
@@ -127,47 +127,85 @@ class TestVADUtils(unittest.TestCase):
         N = 720 * 2
         t = np.linspace(0, 360, N)
 
-        # Unweighted VAD
+        # Standard VAD test
         true_wind_speed = 11
         true_wind_dir = 60
         data = GenerateVAD(speed=true_wind_speed, dirn=true_wind_dir, dirn_grid=t) + GenerateNoiseNormal(num_samples=N)
-        wind_speed, wind_dir, vad_fit = fitVAD(t, data, signal_func, showDebugPlot=False, description='')
+        wind_speed, wind_dir, _, vad_fit = fitVAD(t, data, signal_func, showDebugPlot=False, description='')
         self.assertTrue(np.isclose(a=true_wind_speed, b=wind_speed, rtol=1, atol=1))
         self.assertTrue(np.isclose(a=true_wind_dir, b=wind_dir, rtol=5, atol=5))
 
-        # Weighted VAD
+        # Test for weighted/unweighted VAD on pure/mixed cases
         true_wind_speed = 15
         true_wind_dir = 90
         sec_wind_speed = 11
         sec_wind_dirn = 68
         vad_main = GenerateVAD(speed=true_wind_speed, dirn=true_wind_dir, dirn_grid=t) + GenerateNoiseNormal(
             num_samples=N)
-        vad_sec = GenerateVAD(speed=sec_wind_speed, dirn=sec_wind_dirn, dirn_grid=t) + GenerateNoiseNormal(num_samples=N)
-
+        vad_sec = GenerateVAD(speed=sec_wind_speed, dirn=sec_wind_dirn, dirn_grid=t) + GenerateNoiseNormal(
+            num_samples=N)
 
         vad_mix, is_main_vad, a_idxs, mix_idxs, b_idxs, weights_mix = MixVADs(vad_main=vad_main, vad_sec=vad_sec,
                                                                               a=1 / 20, mix_r=9 / 10)
 
         ## Test using all points
-        wind_speed, wind_dir, vad_fit = fitVAD(t, vad_main, signal_func, showDebugPlot=False, description='')
+        wind_speed, wind_dir, _, vad_fit = fitVAD(t, vad_main, signal_func, showDebugPlot=False, description='')
         print()
         print("Fit on pure VAD")
         print(wind_speed)
         print(wind_dir)
         print()
 
-        wind_speed, wind_dir, vad_fit = fitVAD(t, vad_mix, signal_func, showDebugPlot=False, description='')
+        wind_speed, wind_dir, _, vad_fit = fitVAD(t, vad_mix, signal_func, showDebugPlot=False, description='')
         print("Unweighted fit on contaminated VAD")
         print(wind_speed)
         print(wind_dir)
         print()
 
-        wind_speed, wind_dir, vad_fit = fitVAD(t, vad_mix, signal_func, showDebugPlot=False, description='',
-                                               weights=is_main_vad)
+        wind_speed, wind_dir, _, vad_fit = fitVAD(t, vad_mix, signal_func, showDebugPlot=False, description='',
+                                                  weights=is_main_vad)
         print("Weighted fit on contaminated VAD")
         print(wind_speed)
         print(wind_dir)
         print()
+
+        ## Coverage tests ##
+        N = 360
+        t = np.linspace(0, 360, N)
+        base_vad_data = GenerateVAD(speed=true_wind_speed, dirn=true_wind_dir, dirn_grid=t)
+
+        # No missing data
+        miss_prop, miss_type, start_az = 0.0, Missingness.random, 300
+        data = AddVADMissingness(y_data=base_vad_data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop,
+                                 start_az=start_az)
+        wind_speed, wind_dir, vad_coverage, vad_fit = fitVAD(t, data, signal_func, showDebugPlot=False, description='',
+                                                             min_required_nsamples=100)
+        self.assertTrue(np.isclose(a=true_wind_speed, b=wind_speed, rtol=1, atol=1))
+        self.assertTrue(np.isclose(a=true_wind_dir, b=wind_dir, rtol=5, atol=5))
+        expected_coverage = (1 - miss_prop) * 100
+        self.assertAlmostEqual(first=expected_coverage, second=vad_coverage, delta=2)
+
+        # missing random azimuths
+        miss_prop, miss_type, start_az = 0.6, Missingness.random, 300
+        data = AddVADMissingness(y_data=base_vad_data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop,
+                                 start_az=start_az)
+        wind_speed, wind_dir, vad_coverage, vad_fit = fitVAD(t, data, signal_func, showDebugPlot=False, description='',
+                                                             min_required_nsamples=100)
+        self.assertTrue(np.isclose(a=true_wind_speed, b=wind_speed, rtol=1, atol=1))
+        self.assertTrue(np.isclose(a=true_wind_dir, b=wind_dir, rtol=5, atol=5))
+        expected_coverage = (1 - miss_prop) * 100
+        self.assertAlmostEqual(first=expected_coverage, second=vad_coverage, delta=2)
+
+        # missing azimuth sectors
+        miss_prop, miss_type, start_az = 0.167, Missingness.sector, 330
+        data = AddVADMissingness(y_data=base_vad_data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop,
+                                 start_az=start_az)
+        wind_speed, wind_dir, vad_coverage, vad_fit = fitVAD(t, data, signal_func, showDebugPlot=False, description='',
+                                                             min_required_nsamples=100)
+        self.assertTrue(np.isclose(a=true_wind_speed, b=wind_speed, rtol=1, atol=1))
+        self.assertTrue(np.isclose(a=true_wind_dir, b=wind_dir, rtol=5, atol=5))
+        expected_coverage = (1 - miss_prop) * 100
+        self.assertAlmostEqual(first=expected_coverage, second=vad_coverage, delta=2)
 
     def test_MinMaxNormalization(self):
         x = np.array([0.1, 0.5, 0.9])
@@ -232,6 +270,7 @@ class TestVADUtils(unittest.TestCase):
         bi_score = np.array([0.6, 0.7, 0.99])
         pred_score = GetVADWeights(bi_scores_cut=bi_score, echo_type=VADMask.weather, to_normalize=True)
         self.assertTrue(pred_score == 1)
+
 
 if __name__ == "__main__":
     unittest.main()

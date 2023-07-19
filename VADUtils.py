@@ -92,15 +92,26 @@ def MixVADs(vad_main, vad_sec, a, mix_r):
 
 
 def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights=1, min_required_nsamples=720):
-    """
+    """Estimates wind velocity using a sinusoid fit to radial velocities from VAD. All velocities are assumed to be in
+    the range of -65.4 to + 64.5. Values outside this range are ignored.
     :param pred_var: Should have shape (N,).
     :param resp_var: Should have shape (N,).
     :param signal_func:
     :param showDebugPlot:
     :return:
     """
+
+    # Filter invalid velocities
+    idx_valid = gu.logical_and(np.isfinite(resp_var), resp_var > -64.5, resp_var < 64.5)
+    pred_var = pred_var[idx_valid]
+    resp_var = resp_var[idx_valid]
+
     if len(pred_var) < min_required_nsamples:
-        return np.nan, np.nan, None
+        return np.nan, np.nan, np.nan, None
+
+    # Calculate coverage.
+    unique_az_bins = np.unique(pred_var // 1)
+    vad_coverage = len(unique_az_bins) * 100 / 361
 
     # Cost function.
     cost_func = lambda x: (x[0] * np.sin(2 * np.pi * (1 / 360) * pred_var + x[1]) - resp_var) * weights
@@ -162,7 +173,7 @@ def fitVAD(pred_var, resp_var, signal_func, showDebugPlot, description, weights=
         plt.tight_layout()
         plt.suptitle(description)
         plt.show()
-    return wind_speed, wind_dir, optimized_signal
+    return wind_speed, wind_dir, vad_coverage, optimized_signal
 
 
 def IsVADDistributionValid(az_cut, wind_dir, echo_type):
@@ -290,24 +301,26 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
         mean_prob = np.nanmean(bi_scores_cut)
 
         description = "{}, {}m".format(GetVADMaskDescription(echo_type), height_vad)
-        wind_speed, wind_dir, fitted_points = fitVAD(az_cut, velocity_cut, signal_func, showDebugPlot, description,
-                                                     weights=weights_cut, min_required_nsamples=min_required_nsamples)
+        wind_speed, wind_dir, vad_coverage, fitted_points = fitVAD(az_cut, velocity_cut, signal_func, showDebugPlot,
+                                                                   description, weights=weights_cut,
+                                                                   min_required_nsamples=min_required_nsamples)
 
         if math.isnan(wind_dir):
             vad_valid = False
         else:
             vad_valid = IsVADDistributionValid(az_cut, wind_dir, echo_type)
 
+        # TODO(pjatau) Can remove this check and filter by coverage.
         if not vad_valid:
-            wind_speed, wind_dir, fitted_points = np.nan, np.nan, None
+            wind_speed, wind_dir, vad_coverage, fitted_points = np.nan, np.nan, np.nan, None
 
         windU, windV = Polar2CartesianComponentsDf(wind_speed, wind_dir)
         wind_profile_vad.append(
-            [wind_speed, wind_dir, windU, windV, height_vad, len(velocity_cut), mean_ref, mean_prob])
+            [wind_speed, wind_dir, windU, windV, height_vad, len(velocity_cut), mean_ref, mean_prob, vad_coverage])
 
     wind_profile_vad = pd.DataFrame(wind_profile_vad,
                                     columns=["wind_speed", "wind_direction", "wind_U", "wind_V", "height",
-                                             "num_samples", "mean_ref", "mean_prob"])
+                                             "num_samples", "mean_ref", "mean_prob", "coverage_perc"])
     wind_profile_vad = wind_profile_vad.drop_duplicates(subset='height', keep='last', ignore_index=True)
 
     tmp = False
@@ -343,9 +356,17 @@ def Main():
     true_wind_dir = random.uniform(0, 360)
     print("true wind speed :", true_wind_speed, "mps.\nDirection: ", true_wind_dir, " degrees.")
 
-    data = GenerateVAD(speed=true_wind_speed, dirn=true_wind_dir, dirn_grid=t) + GenerateNoiseNormal(num_samples=N)
+    # Generate VAD
+    data = GenerateVAD(speed=true_wind_speed, dirn=true_wind_dir, dirn_grid=t) + \
+           1.5 * GenerateNoiseNormal(num_samples=N)
 
-    wind_speed, wind_dir, vad_fit = fitVAD(t, data, signal_func, showDebugPlot, description='')
+    # Add missingness
+    miss_prop, miss_type, start_az = 0.5, Missingness.random, 300
+    data = AddVADMissingness(y_data=data, x_grid=t, miss_type=miss_type, miss_prop=miss_prop, start_az=start_az)
+
+    wind_speed, wind_dir, vad_coverage, vad_fit = fitVAD(t, data, signal_func, showDebugPlot, description='',
+                                                         min_required_nsamples=100)
+    return
 
 
 if __name__ == "__main__":
