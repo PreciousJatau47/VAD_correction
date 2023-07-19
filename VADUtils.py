@@ -47,7 +47,7 @@ def AddVADMissingness(y_data, x_grid, miss_type, miss_prop=0.0, start_az=0):
             idx = np.logical_and(x_grid >= start, x_grid < stop)
             miss_idxs = np.logical_or(miss_idxs, idx)
 
-    y_data[miss_idxs] = -64.5
+    y_data[miss_idxs] = np.nan
     return y_data
 
 
