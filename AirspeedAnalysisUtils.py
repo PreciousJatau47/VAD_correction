@@ -38,8 +38,8 @@ def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist, figure_dir, debug_
     vel_profiles['height_m'] = round(vel_profiles['height_m'])
 
     # VAD
-    vad_vel_cols_base = ["height", "wind_speed", "wind_direction", "num_samples", "coverage_perc"]
-    new_cols_base = ["height_m", "{}_speed", "{}_direction", "num_{}_height", "{}_coverage_perc"]
+    vad_vel_cols_base = ["height", "wind_speed", "wind_direction", "num_samples", "num_samples_50", "coverage_perc"]
+    new_cols_base = ["height_m", "{}_speed", "{}_direction", "num_{}_height", "num_{}_height_50", "{}_coverage_perc"]
 
     for echo in vad:
         if echo == VADMask.weather:

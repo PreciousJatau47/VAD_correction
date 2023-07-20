@@ -283,8 +283,8 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
         idx_height_vad = range_diff.idxmin(skipna=False)
         height_vad = np.array(radar_sp_table['height_bin_meters'])[idx_height_vad]
 
-        idx_cut = radar_sp_table['height_bin_meters'] == height_vad
-        idx_cut = np.logical_and(idx_cut, vad_mask)
+        height_cut = radar_sp_table['height_bin_meters'] == height_vad
+        idx_cut = np.logical_and(height_cut, vad_mask)
         velocity_cut = radar_sp_table['velocity'][idx_cut]
         az_cut = radar_sp_table['azimuth'][idx_cut]
         bi_scores_cut = radar_sp_table['BIProb'][idx_cut]
@@ -314,13 +314,20 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
         if not vad_valid:
             wind_speed, wind_dir, vad_coverage, fitted_points = np.nan, np.nan, np.nan, None
 
+        # VAD output
         windU, windV = Polar2CartesianComponentsDf(wind_speed, wind_dir)
+
+        mask_50_cut = GetVADMask(radar_sp_table, echo_type, clf_purity_threshold=0.5)
+        mask_50_cut = np.logical_and(height_cut, mask_50_cut)
+        num_samples_50 = np.nansum(mask_50_cut)
+
         wind_profile_vad.append(
-            [wind_speed, wind_dir, windU, windV, height_vad, len(velocity_cut), mean_ref, mean_prob, vad_coverage])
+            [wind_speed, wind_dir, windU, windV, height_vad, len(velocity_cut), mean_ref, mean_prob, vad_coverage,
+             num_samples_50])
 
     wind_profile_vad = pd.DataFrame(wind_profile_vad,
                                     columns=["wind_speed", "wind_direction", "wind_U", "wind_V", "height",
-                                             "num_samples", "mean_ref", "mean_prob", "coverage_perc"])
+                                             "num_samples", "mean_ref", "mean_prob", "coverage_perc", "num_samples_50"])
     wind_profile_vad = wind_profile_vad.drop_duplicates(subset='height', keep='last', ignore_index=True)
 
     tmp = False

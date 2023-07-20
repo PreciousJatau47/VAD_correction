@@ -72,6 +72,7 @@ def GetL3VADWindProfile(local_path, radar_id, time, height_grid_m, height_binsiz
     l3_vad['mean_ref'] = np.nan
     l3_vad['mean_prob'] = np.nan
     l3_vad['coverage_perc'] = np.nan
+    l3_vad['num_samples_50'] = np.nan
 
     # Match units/reference to local VAD profiles.
     l3_vad['wind_direction'] = (l3_vad['wind_direction'] + 180) % 360  # Convert to wind destination.
