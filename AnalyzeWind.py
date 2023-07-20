@@ -272,6 +272,8 @@ def InterpolateVADWind(vad_df, height_grid_interp, max_height_diff, max_height):
     df_interp.loc[range(len(vad_df)), 'mean_ref'] = vad_df['mean_ref']
     df_interp['mean_prob'] = np.nan
     df_interp.loc[range(len(vad_df)), 'mean_prob'] = vad_df['mean_prob']
+    df_interp['coverage_perc'] = np.nan
+    df_interp.loc[range(len(vad_df)), 'coverage_perc'] = vad_df['coverage_perc']
 
     df_interp = df_interp.sort_values(by=['height'])
 
