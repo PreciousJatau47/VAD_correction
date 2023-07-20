@@ -7,7 +7,7 @@ from NexradUtils import *
 from VADMaskEnum import VADMask
 from TrueWindEnum import *
 from VADUtils import VADWindProfile
-from L3VADReader import GetL3VADWindProfile
+from third_party.l3_vad.L3VADReader import GetL3VADWindProfile
 import GeneralUtils as gu
 from collections import Counter
 import calendar

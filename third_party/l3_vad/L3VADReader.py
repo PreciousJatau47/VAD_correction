@@ -1,8 +1,8 @@
 from __future__ import print_function
 import numpy as np
 import os
-from L3VAD import VADFile
-from L3VADUtils import *
+from .L3VAD import VADFile
+from .L3VADUtils import *
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -71,6 +71,7 @@ def GetL3VADWindProfile(local_path, radar_id, time, height_grid_m, height_binsiz
     l3_vad['num_samples'] = np.nan
     l3_vad['mean_ref'] = np.nan
     l3_vad['mean_prob'] = np.nan
+    l3_vad['coverage_perc'] = np.nan
 
     # Match units/reference to local VAD profiles.
     l3_vad['wind_direction'] = (l3_vad['wind_direction'] + 180) % 360  # Convert to wind destination.
