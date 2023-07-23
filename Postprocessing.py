@@ -290,10 +290,9 @@ def LoadWindError(airspeed_log_dir, airspeed_files, target_echoes, vad_score_typ
                 wind_error['{}_direction'.format(
                     GetVADMaskDescription(echo))], wind_error['wind_direction'])
 
-    # TODO(pjatau) Calculate using 'num_insects_height_50' e.t.c i.e using counts at tau = 0.5
-    if 'num_insects_height' in wind_error.columns:
-        wind_error['insect_prop_bio_height'] = 100 * wind_error['num_insects_height'] / (
-                wind_error['num_insects_height'] + wind_error['num_birds_height'])
+    if 'num_insects_height_50' in wind_error.columns:
+        wind_error['insect_prop_bio_height'] = 100 * wind_error['num_insects_height_50'] / (
+                wind_error['num_insects_height_50'] + wind_error['num_birds_height_50'])
     else:
         wind_error['insect_prop_bio_height'] = np.nan
 
