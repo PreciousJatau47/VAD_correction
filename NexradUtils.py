@@ -65,7 +65,8 @@ def GetFileListRadar(batch_folder_path, start_day, stop_day, date_pattern):
 
 def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l3, l3_files_dic, max_range,
                      height_binsize=0.04, clf_file=None, norm_stats_file=None, correct_hca_weather=False,
-                     max_height_correction=1000, biw_norm_stats_file=None, biw_clf_file=None, allowed_el_hca=None):
+                     max_height_correction=1000, biw_norm_stats_file=None, biw_clf_file=None, allowed_el_hca=None,
+                     rhv_weather_thresh=0.88):
     # Read radar volume.
     try:
         print("Opening ", os.path.join(batch_folder_path_radar, radar_subpath))
@@ -94,20 +95,23 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
     data_table["height"] = data_table["range"] * np.sin(data_table["elevation"] * np.pi / 180)
 
     if correct_hca_weather:
-        X_biw = data_table.loc[:, ['differential_reflectivity', 'differential_phase', 'cross_correlation_ratio']]
-        X_biw.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
-        X_biw.rename(columns={"differential_phase": "pdp"}, inplace=True)
-        X_biw.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
-        data_table['BIWClass'] = -1
-        biw_class, _ = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
-        data_table.loc[:, 'BIWClass'] = biw_class
-        # data_table.loc[:, 'BIWClass'] = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
+        # X_biw = data_table.loc[:, ['differential_reflectivity', 'differential_phase', 'cross_correlation_ratio']]
+        # X_biw.rename(columns={"differential_reflectivity": "ZDR"}, inplace=True)
+        # X_biw.rename(columns={"differential_phase": "pdp"}, inplace=True)
+        # X_biw.rename(columns={"cross_correlation_ratio": "RHV"}, inplace=True)
+        # data_table['BIWClass'] = -1
+        # biw_class, _ = classify_echoes(X_biw, biw_clf_file, norm_stats_path=biw_norm_stats_file)
+        # data_table.loc[:, 'BIWClass'] = biw_class
+
+        # Detect weather using RHV threshold
+        data_table['weather_rhv'] = np.where(data_table['cross_correlation_ratio'] >= rhv_weather_thresh, 3, -3)
 
         # Correct HCA's misclassification of birds as weather within VAD region.
         # if weather hca, and non-weather biw, and within collection region, set to biological
         correction_msk = data_table["height"] < max_height_correction
         weather_hca = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
-        non_weather_biw = data_table['BIWClass'] != 3
+        # non_weather_biw = data_table['BIWClass'] != 3
+        non_weather_biw = data_table['weather_rhv'] != 3
         correction_msk = np.logical_and(correction_msk, weather_hca)
         correction_msk = np.logical_and(correction_msk, non_weather_biw)
         data_table.loc[correction_msk, "hca"] = 10.0
