@@ -88,7 +88,7 @@ def UpdateWindError(wind_error_df, target_file, vad_profiles, sounding_df, echo_
         return wind_error_df
 
     for echo_type in vad_profiles:
-        if vad_profiles[echo_type].empty:
+        if vad_profiles[echo_type].empty and echo_type != VADMask.external_l3_vad_profile:
             return wind_error_df
 
     airspeed_scan = GetVelocitiesScan(wind_file=target_file, vad=vad_profiles, sounding_df=sounding_df,
