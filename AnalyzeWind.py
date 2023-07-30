@@ -490,8 +490,8 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, l3_vad_fold
                 wind_profile_vad = pd.DataFrame(
                     {'height': [-999], 'wind_direction': [np.nan], 'wind_speed': [np.nan], 'rms_error': [np.nan],
                      'divergence': [np.nan], 'slant_range': [np.nan], 'elev_angle': [np.nan], 'altitude': [np.nan],
-                     'num_samples': [np.nan], 'mean_ref': [np.nan], 'mean_prob': [np.nan], 'height_m': [np.nan],
-                     'wind_U': [np.nan], 'wind_V': [np.nan]})
+                     'num_samples': [np.nan], 'mean_ref': [np.nan], 'mean_prob': [np.nan], 'coverage_perc': [np.nan],
+                     'num_samples_50': [np.nan], 'height_m': [np.nan], 'wind_U': [np.nan], 'wind_V': [np.nan]})
         else:
             wind_profile_vad = VADWindProfile(signal_func, vad_heights, vad_mask, data_table,
                                               showDebugPlot=show_vad_plot, use_weights=use_vad_weights,
