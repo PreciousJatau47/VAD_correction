@@ -58,7 +58,7 @@ def RapXSoundingComparison():
     max_height = 1.1 * max_height_VAD  # meters.
     max_height_diff = 300  # meters.
 
-    for idx_days in range(10, len(days)):
+    for idx_days in range(len(days)):
         curr_day = days[idx_days]
         print("Processing ", curr_day, " ........")
         radar_scans = radar_scans_day[curr_day]  # ~200 scans
