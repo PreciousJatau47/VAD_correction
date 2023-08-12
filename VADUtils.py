@@ -263,7 +263,7 @@ def GetVADWeights(bi_scores_cut, echo_type, to_normalize=False):
 
 
 def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebugPlot, use_weights=False,
-                   clf_purity_threshold=0.5,min_required_nsamples=720):
+                   clf_purity_threshold=0.5, min_required_nsamples=720, min_req_coverage=75):
     """
     :param signal_func:
     :param vad_ranges:
@@ -308,9 +308,8 @@ def VADWindProfile(signal_func, vad_ranges, echo_type, radar_sp_table, showDebug
         if math.isnan(wind_dir):
             vad_valid = False
         else:
-            vad_valid = IsVADDistributionValid(az_cut, wind_dir, echo_type)
+            vad_valid = np.isfinite(vad_coverage) and vad_coverage > min_req_coverage
 
-        # TODO(pjatau) Can remove this check and filter by coverage.
         if not vad_valid:
             wind_speed, wind_dir, vad_coverage, fitted_points = np.nan, np.nan, np.nan, None
 

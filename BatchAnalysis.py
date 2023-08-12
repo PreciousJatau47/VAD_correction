@@ -145,7 +145,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, level3_vad_folder
                     force_output_logging, ground_truth_source=WindSource.sounding, rap_folder=None,
                     correct_hca_weather=False, biw_norm_stats_file=None, biw_clf_file=None, log_dir='./',
                     experiment_name='', allowed_el_hca=None, use_vad_weights=False, clf_purity_threshold=0.5,
-                    min_required_nsamples=720, height_binsize=0.04):
+                    min_required_nsamples=720, height_binsize=0.04, min_req_coverage=75):
 
     # Echo count options
     echo_count_log_dir = os.path.join(echo_count_log_dir, batch_folder)
@@ -339,7 +339,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, level3_vad_folder
                                                                            use_vad_weights=use_vad_weights,
                                                                            clf_purity_threshold=clf_purity_threshold,
                                                                            min_required_nsamples=min_required_nsamples,
-                                                                           height_binsize=height_binsize)
+                                                                           height_binsize=height_binsize,
+                                                                           min_req_coverage=min_req_coverage)
 
                     # Initialize accumulator for VAD profiles.
                     if vad_profiles_accumm is None:
@@ -721,6 +722,7 @@ def Main():
     # VAD
     vad_jobs = [VADMask.birds, VADMask.insects, VADMask.weather, VADMask.biological]
     min_req_nsamples_vad = 720
+    min_req_coverage_vad = 75
     delta_time_hr = 2 * 60 / 60
     time_window = {'noon': (12 - delta_time_hr, 12 + delta_time_hr),
                    'midnight': (24 - delta_time_hr, (24 + delta_time_hr) % 24)}
