@@ -766,7 +766,8 @@ def Main():
                             log_dir=e2e_analysis_log_dir, experiment_name=experiment_name,
                             allowed_el_hca=allowed_el_hca,
                             use_vad_weights=use_vad_weights, clf_purity_threshold=clf_purity_threshold,
-                            min_required_nsamples=min_req_nsamples_vad, height_binsize=0.04)
+                            min_required_nsamples=min_req_nsamples_vad, height_binsize=0.04,
+                            min_req_coverage=min_req_coverage_vad)
 
     return
 
