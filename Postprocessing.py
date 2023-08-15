@@ -25,6 +25,16 @@ class VadScore(enum.Enum):
     insect_prop_height = 1
     insect_clf_score = 2
 
+def GetVadScoreDescription(in_enum):
+    if in_enum == VadScore.insect_prop_height:
+        return "Relative proportion of insects in VAD"
+    elif in_enum == VadScore.insect_prop_scan:
+        return "Relative proportion of insects in scan"
+    elif in_enum == VadScore.insect_clf_score:
+        return "Average insect probability in VAD"
+    else:
+        return "Undefined"
+
 class Constants:
     DELTA_INSECT_PROP = 5
     DELTA_HEIGHT = 50
@@ -316,15 +326,18 @@ def LoadWindError(airspeed_log_dir, airspeed_files, target_echoes, vad_score_typ
     return wind_error_constrained
 
 
-def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plots, figure_summary_dir,
+def VisualizeFlightspeeds(wind_error, constraints, vad_score_desc, color_info, c_group, save_plots, figure_summary_dir,
                           plot_title_suffix, out_name_suffix, max_airspeed=None, show_plots=True,
                           generate_weekly_month_profiles=True):
+
     delta_insect_prop = Constants.DELTA_INSECT_PROP
     delta_height = Constants.DELTA_HEIGHT
     delta_time_hour = Constants.DELTA_TIME_HR
     impurity_tolerance = Constants.IMPURITY_TOLERANCE
 
     idx_constraints = ImposeConstraints(wind_error, constraints)
+
+    vad_score_desc_xlabel = vad_score_desc + " (%)"
 
     # local VAD on biological echoes vs l3 VAD
     if 'l3_vad_speed' in wind_error.columns:
@@ -675,7 +688,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
              label=r"$\mu$+3$\sigma$")
     plt.xlim(0, 100)
     plt.ylim(-improv_lim, improv_lim)
-    plt.xlabel("Wind tracing index [%]")
+    plt.xlabel(vad_score_desc_xlabel)
     plt.ylabel(r"$bias_{bio} - bias_{insects}$")
     plt.title(r"$bias_{bio} - bias_{insects}. $" + "Height {} - {} m".format(lb_height, ub_height))
     plt.legend()
@@ -689,7 +702,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     plt.scatter(bias_df['insect_prop_bio'], bias_df['airspeed_biological'], s=4, alpha=0.2)
     plt.plot(avg_bias_df['insect_prop_bins'], avg_bias_df['airspeed_biological'], c='red', linewidth=3,
              label=r'average $\mu$')
-    plt.xlabel("Wind tracing index [%]")
+    plt.xlabel(vad_score_desc_xlabel)
     plt.ylabel("Biases from bio VAD [m/s]")
     plt.title("Biases from VAD on biological echoes. Height {} - {} m".format(lb_height, ub_height))
     plt.legend()
@@ -742,7 +755,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     plt.plot(cases_lost_df['insect_prop_bins'], cases_lost_df['prop_cases_lost_bio_ins'], linewidth=3)
     plt.xlim(0, 100)
     plt.ylim(0, 100)
-    plt.xlabel('Wind tracing index (%)')
+    plt.xlabel(vad_score_desc_xlabel)
     plt.ylabel('Fraction of cases lost (%)')
     plt.title("Fraction of cases lost after IVWP")
     if save_plots:
@@ -788,14 +801,14 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     info_str = ">  {} m/s,  {}%\n<= {} m/s, {}%\nelse {}%".format(thresholds[1], round(pos_diff, 2), thresholds[0],
                                                                   round(neg_diff, 2), round(zero_diff, 2))
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_diff'], cmap='jet',
-                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         xlab=vad_score_desc_xlabel, ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="airspeed_difference.png", min_z=-max_amp,
                          max_z=max_amp, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), plot_txt=(55, 800, info_str), cbar_label="[m/s]",
                          save_plot=save_plots)
 
     title_str = "".join(["Histogram of ", title_str])
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid["count_airspeed_diff"], cmap='jet',
-                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         xlab=vad_score_desc_xlabel, ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="count_bi_airspeed_difference.png", min_z=-max_amp,
                          max_z=None, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), plot_txt=None, cbar_label="[no unit]",
                          save_plot=save_plots)
@@ -817,7 +830,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
                                                                   round(neg_diff, 2), round(zero_diff, 2))
 
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_diff_bio_ins'], cmap='jet',
-                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         xlab=vad_score_desc_xlabel, ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="airspeed_difference_bio_ins.png", min_z=-max_amp_bio_ins,
                          max_z=max_amp_bio_ins, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), plot_txt=(55, 800, info_str), cbar_label="[m/s]",
                          save_plot=save_plots)
@@ -832,7 +845,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     title_str = "VAD wind biases averaged by wind tracing score"
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins,
                          z=height_ip_grid['airspeed_biological'], cmap='jet',
-                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         xlab=vad_score_desc_xlabel, ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir,
                          out_name="airspeed_biological_height_insectprop.png", min_z=0,
                          max_z=max_airspeed,
@@ -842,14 +855,14 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
     title_str = "L3 VAD wind biases averaged by wind tracing score"
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_l3_vad'], cmap='jet',
-                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         xlab=vad_score_desc_xlabel, ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="airspeed_l3vad_height_insectprop.png", min_z=0,
                          max_z=None, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), plot_txt=None,
                          cbar_label="[m/s]", save_plot=save_plots)
 
     title_str = "Histogram of l3 VAD biases"
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['count_airspeed_l3_vad'],
-                         cmap='jet', xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         cmap='jet', xlab=vad_score_desc_xlabel, ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="count_airspeed_l3vad_height_insectprop.png", min_z=0,
                          max_z=None, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), plot_txt=None,
                          cbar_label="[no unit]", save_plot=save_plots)
@@ -860,7 +873,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
 
     title_str = r"VAD wind biases after IVWP"
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['airspeed_insects'], cmap='jet',
-                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         xlab=vad_score_desc_xlabel, ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="airspeed_ins_height_insectprop.png", min_z=0,
                          max_z=max_airspeed, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), cbar_label="[m/s]",
                          save_plot=save_plots)
@@ -868,7 +881,7 @@ def VisualizeFlightspeeds(wind_error, constraints, color_info, c_group, save_plo
     title_str = r"Fraction of cases lost after IVWP"
     plot_averages_pcolor(x=ins_prop_bins, y=unique_height_bins, z=height_ip_grid['prop_cases_lost_bio_ins'],
                          cmap='jet',
-                         xlab='wind tracing score [%]', ylab='height [m]', title_str=title_str,
+                         xlab=vad_score_desc_xlabel, ylab='height [m]', title_str=title_str,
                          out_dir=figure_summary_dir, out_name="prop_cases_lost_height_insectprop.png", min_z=None,
                          max_z=100, xlim=(min_insect_prop_plot, 100), ylim=(0, 1500), cbar_label="[no unit]",
                          save_plot=save_plots)
@@ -1300,7 +1313,8 @@ def Main():
 
     experiment_id = "post_processing_default"
     correct_hca_weather = True
-    vad_score = VadScore.insect_clf_score
+    vad_score = VadScore.insect_prop_height
+    vad_score_desc = GetVadScoreDescription(vad_score)
     MAX_WEATHER_PROP = 10  # 10
     MAX_WEATHER_PROP_SCAN = 5  # 5
     remove_cases_list = []
@@ -1347,8 +1361,10 @@ def Main():
     if not os.path.isdir(figure_summary_dir):
         os.makedirs(figure_summary_dir)
 
-    VisualizeFlightspeeds(wind_error_constrained, constraints, color_info, c_group, save_plots, figure_summary_dir,
-                          plot_title_suffix, out_name_suffix, max_airspeed=None, show_plots=True,
+    VisualizeFlightspeeds(wind_error=wind_error_constrained, constraints=constraints, vad_score_desc=vad_score_desc,
+                          color_info=color_info, c_group=c_group, save_plots=save_plots,
+                          figure_summary_dir=figure_summary_dir, plot_title_suffix=plot_title_suffix,
+                          out_name_suffix=out_name_suffix, max_airspeed=None, show_plots=True,
                           generate_weekly_month_profiles=generate_weekly_month_profiles)
 
     # Search for cases defined by constraints.
