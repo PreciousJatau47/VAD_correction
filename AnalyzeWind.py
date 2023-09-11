@@ -471,7 +471,7 @@ def AnalyzeWind(radar_data_file, radar_data_folder, hca_data_folder, l3_vad_fold
         vad_heights = vad_debug_params['vad_heights']
         show_vad_plot = vad_debug_params['show_plot']
     else:
-        min_height_bin = np.min(data_table["height_bin_meters"])
+        min_height_bin = 100 # TODO(pjatau) make this a parameter?
         max_height_bin = 1.1 * max_height_VAD if match_radar_and_sounding_grid else max_height_VAD
         vad_heights = np.arange(min_height_bin, max_height_bin, height_binsize_m)
         # vad_heights = np.array([480])
