@@ -68,6 +68,12 @@ def GetVelocitiesScan(wind_file, vad, sounding_df, echo_dist, figure_dir, debug_
     vel_profiles['prop_weather'] = echo_dist['weather']
     vel_profiles['file_name'] = wind_file_no_ext
 
+    # Remove points interpolated to sounding's grid
+    # TODO(pjatau) Only interpolate to VAD's grid instead
+    idx_bio = np.isfinite(vel_profiles['num_biological_height'])
+    vel_profiles = vel_profiles[idx_bio]
+    vel_profiles = vel_profiles.reset_index(drop=True)
+
     return vel_profiles
 
 def extract_features_from_ppi_name(s):
