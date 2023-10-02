@@ -116,7 +116,7 @@ def PrepareDataTable(batch_folder_path_radar, radar_subpath, batch_folder_path_l
         correction_msk = np.logical_and(correction_msk, non_weather_biw)
         data_table.loc[correction_msk, "hca"] = 10.0
 
-    data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -8.0
+    data_table["mask_differential_reflectivity"] = data_table["differential_reflectivity"] > -7.9375
     data_table["hca_bio"] = data_table["hca"] == 10.0
     data_table["hca_weather"] = np.logical_and(data_table["hca"] >= 30.0, data_table["hca"] <= 100.0)
     data_table["height_bin_meters"] = (data_table[
