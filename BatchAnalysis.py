@@ -233,6 +233,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, level3_vad_folder
         bird_count_scan = []
         insect_count_scan = []
         weather_count_scan = []
+        bio_count_scan = []
+        total_count_scan = []
 
         prev_scan_time = -1
         vad_profiles_accumm = None
@@ -262,10 +264,14 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, level3_vad_folder
                 n_birds = np.sum(data_table['BIClass'] == 1)
                 n_insects = np.sum(data_table['BIClass'] == 0)
                 n_weather = np.sum(data_table['hca_weather'])
+                n_bio = np.sum(data_table['hca_bio'])
+                n_total = data_table.shape[0]
 
             bird_count_scan.append(n_birds)
             insect_count_scan.append(n_insects)
             weather_count_scan.append(n_weather)
+            bio_count_scan.append(n_bio)
+            total_count_scan.append(n_total)
 
             # Visualize scan.
             if save_ppi_plots and radar_obj is not None:
@@ -433,7 +439,8 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, level3_vad_folder
                                                  n_insects, n_weather)
 
         echo_count_scan = {VADMask.birds: bird_count_scan, VADMask.insects: insect_count_scan,
-                           VADMask.weather: weather_count_scan}
+                           VADMask.weather: weather_count_scan, VADMask.biological: bio_count_scan,
+                           VADMask.default: total_count_scan}
         result = (radar_scans, echo_count_scan)
 
         # Save echo distribution for the whole scan.
