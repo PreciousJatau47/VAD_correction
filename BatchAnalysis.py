@@ -318,6 +318,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, level3_vad_folder
                                                        wind_source_desc)
 
                     vad_sounding_path = os.path.join(vad_sounding_dir, ''.join([target_file_no_ext, '_wind', '.pkl']))
+                    vcp = radar_obj.metadata['vcp_pattern']
 
                     # Analyze wind. Takes ~16s.
                     print('Analyzing wind for ', target_file, ' ....')
