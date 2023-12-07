@@ -371,7 +371,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, level3_vad_folder
                                                                  echo_dist_VAD, error_fn,
                                                                  reduce_fn,
                                                                  ground_truth_source, figure_dir, batch_folder, n_birds,
-                                                                 n_insects, n_weather)
+                                                                 n_insects, n_weather, vcp=vcp)
                         files_accumm = []
 
                     prev_scan_time = radar_scan_time
@@ -381,7 +381,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, level3_vad_folder
                                                     echo_dist_VAD, error_fn,
                                                     reduce_fn,
                                                     ground_truth_source, figure_dir, batch_folder, n_birds, n_insects,
-                                                    n_weather)
+                                                    n_weather, vcp=vcp)
 
                     # Save output from AnalyzeWind.
                     with open(vad_sounding_path, 'wb') as p_out:
@@ -437,7 +437,7 @@ def E2EWindAnalysis(batch_folder, radar_folder, level3_folder, level3_vad_folder
                                                  echo_dist_VAD, error_fn,
                                                  reduce_fn,
                                                  ground_truth_source, figure_dir, batch_folder, n_birds,
-                                                 n_insects, n_weather)
+                                                 n_insects, n_weather, vcp=vcp)
 
         echo_count_scan = {VADMask.birds: bird_count_scan, VADMask.insects: insect_count_scan,
                            VADMask.weather: weather_count_scan, VADMask.biological: bio_count_scan,

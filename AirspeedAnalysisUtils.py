@@ -89,7 +89,7 @@ def extract_features_from_ppi_name(s):
 
 
 def UpdateWindError(wind_error_df, target_file, vad_profiles, sounding_df, echo_dist_VAD, error_fn, reduce_fn,
-                    ground_truth_source, figure_dir, batch_folder, n_birds, n_insects, n_weather):
+                    ground_truth_source, figure_dir, batch_folder, n_birds, n_insects, n_weather, vcp):
     if sounding_df is None or vad_profiles is None or target_file == '':
         return wind_error_df
 
@@ -118,6 +118,7 @@ def UpdateWindError(wind_error_df, target_file, vad_profiles, sounding_df, echo_
     airspeed_scan["month"] = month
     airspeed_scan["day"] = day
     airspeed_scan["time_hour"] = time_hour
+    airspeed_scan["vcp"] = vcp
 
     # Update airspeed table.
     if airspeed_scan is not None:
